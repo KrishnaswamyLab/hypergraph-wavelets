@@ -1,18 +1,15 @@
 import os 
 import numpy as np
-import pandas
 import argparse 
 import anndata as ad
 import torch
 
 # imports for linear probing
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics import f1_score
-from tqdm import tqdm
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
@@ -53,7 +50,6 @@ if __name__ == '__main__':
             print('Number of features does not match')
             #print(f'Expected: {num_features}, Got: {hyperedge_feat.shape[1]}')
             continue
-            #import pdb; pdb.set_trace()
         
         # convert to numpy and set nans to 0
         hyperedge_feat = hyperedge_feat.detach().numpy()
@@ -78,13 +74,7 @@ if __name__ == '__main__':
     # first we need to flatten the features and labels
     features = features.reshape(-1, num_features)
     labels = labels.reshape(-1)
-    # convert labels to one hot
-    #from sklearn.preprocessing import OneHotEncoder
-    #labels_one_hot = OneHotEncoder().fit_transform(labels.reshape(-1, 1)).toarray()
 
-    # labels_one_hot = np.zeros((labels.size, len(label_dict)))
-    # labels_one_hot[np.arange(labels.size), labels] = 1
-    # now we can do linear probing
     # first we need to split the data into training and testing
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=args.seed)
     accuracies = []

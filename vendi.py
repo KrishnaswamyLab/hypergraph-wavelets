@@ -3,9 +3,7 @@ import torch
 import argparse 
 import numpy as np
 import os 
-import pandas as pd
 import anndata as ad
-from tqdm import tqdm
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
@@ -32,7 +30,7 @@ if __name__ == '__main__':
     num_datasets = len(datasets)
     print(f'Number of datasets: {num_datasets}')
     example_features = torch.load(FEATURE_DIR + datasets[0] + '_neighborhood_feat.pt', weights_only=True)
-    # example_features = torch.load(FEATURE_DIR + datasets[0] + '_node_features.pt', weights_only=True)
+
     num_features = example_features.shape[1]
     del example_features
     vendi_scores = []
@@ -42,15 +40,8 @@ if __name__ == '__main__':
 
         # load in the wavelet features
         hyperedge_feat = torch.load(FEATURE_DIR + dataset_name + '_neighborhood_feat.pt', weights_only=True)
-        # hyperedge_feat = torch.load(FEATURE_DIR + dataset_name + '_node_features.pt', weights_only=True)
 
         #print(f'num features: {hyperedge_feat.shape[1]}')
-
-        # if hyperedge_feat.shape[1] != num_features:
-        #     print('Number of features does not match')
-        #     #print(f'Expected: {num_features}, Got: {hyperedge_feat.shape[1]}')
-        #     continue
-        #     #import pdb; pdb.set_trace()
         
         # convert to numpy and set nans to 0
         hyperedge_feat = hyperedge_feat.detach()#.numpy()
