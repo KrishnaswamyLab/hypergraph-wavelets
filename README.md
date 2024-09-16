@@ -7,7 +7,7 @@ The data can be downloaded on the following link:
 You can then extract your zip file into the data/raw folder.
 
 ### Dataset pre-processing
-After all the data was extracted into the raw files, you can use the notebook found at : _notebooks/extract\_section_ to process the raw data and divide the dataset from patients to patients_section level data.
+After all the data was extracted into the raw files, you can use the notebook found at : _notebooks/create\_patients\_section\_files.ipynb_ to process the raw data and divide the dataset from patients level to section level data.
 This notebook will create all the section data in the folder: data/interim/section_data
 
 ## Extracting wavelets features
@@ -18,6 +18,9 @@ The resulting wavelets features will be stored on data/processed/wavelet_feature
 
 ## Evaluating performance
 
-For model evaluation you can run: python3 src/evaluate.py
+We evaluated performance using vendi score and linear probing.
+Each one of those can be computed on the following scripts:
 
-A notebook can also be used
+python3 vendi.py
+
+python3 linear_probing.py

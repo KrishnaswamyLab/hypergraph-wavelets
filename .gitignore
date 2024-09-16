@@ -167,12 +167,6 @@ data/raw/*
 
 .DS_Store
 *.h5ad
-hypgs/models/wandb/*
-hypgs/models/outputs/*
-hypgs/models/MNIST/*
-hypgs/models/lightning_logs/*
-wavelet_features/
-phate_features/
 
 *.pt
 *.sh
