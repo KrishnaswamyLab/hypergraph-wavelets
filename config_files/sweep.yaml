@@ -1,0 +1,17 @@
+project: dmae
+program: train_ae.py
+command:
+  - /gpfs/gibbs/pi/krishnaswamy_smita/xingzhi/.conda_envs/geosink/bin/python
+  - ${program}
+  - ${args_no_hyphens}
+method: grid
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  model.dist_contr_recon_weights:
+    values: [[0,0.5,0.5],[0.5,0,0.5],[0.3,0.3,0.4],[0,0,1]]
+  data.name:
+    # values: ['merfish_data_for_ae_pca']
+    # values: ['merfish_data_for_ae_pca_log001p_dist_subset','merfish_data_for_ae_pca_subset','merfish_data_for_ae_pca_subset_hamming','merfish_data_for_ae_xor_bitwise_pca_subset']
+    values: ['H20.33.001.CX28.MTG.02.007.1.02.02', 'H20.33.044.Cx26.MTG.02.007.1.01.04', 'H21.33.023.Cx26.MTG.02.007.1.03.05', 'H21.33.019.Cx30.MTG.02.007.5.01.01', 'H21.33.022.Cx26.MTG.02.007.2.M.04', 'H21.33.028.CX28.MTG.02.007.1.01.01']

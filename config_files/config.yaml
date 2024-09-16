@@ -1,0 +1,60 @@
+model:
+  dim: 0
+  emb_dim: 2
+  layer_widths: [256, 128, 64]
+  dist_reconstr_weights: [0.9, 0.1, 0.0]
+  dist_recon_topk_coords: 0.
+  eps: 1e-10
+  lr: 0.001
+  weight_decay: 0.0001
+  dropout: 0.2
+  batch_norm: true
+  use_dist_mse_decay: false
+  dist_mse_decay: 0.1
+  cycle_weight: 0.
+  cycle_dist_weight: 0.
+  dist_contr_recon_weights: [0.3, 0.3, 0.3]
+  dist_reconstr_weight : 0.
+  contra_margin: 1.0
+  pos_weight: 1.0
+  neg_weight: 1.0
+
+training:
+  batch_size: 1024
+  max_epochs: 50
+  # max_epochs: 2
+  patience: 50
+  monitor: 'val_loss'
+  accelerator: 'cuda'
+  log_every_n_steps: 100
+  match_potential: true
+  train_test_split: 0.8
+  train_valid_split: 0.8
+  shuffle: true
+  seed: 42
+  lr: 1e-3
+
+path:
+  root: '../results/'
+  model: 'model'
+  procrustes: 'procrustes'
+  save: false
+
+data:
+  root: '../../data/hgsae/'
+  filetype: '.npz'
+  # name: 'merfish_data_for_ae_test'
+  name: 'merfish_data_for_ae'
+  preprocess: 'none'
+  kernel:
+    type: 'gaussian'
+    sigma: 1.0
+    epsilon: 1.0
+    alpha: 10
+    use_std: true
+
+logger:
+  use_wandb: True
+  entity: xingzhis
+  project: "dmae"
+  tags: ['default']

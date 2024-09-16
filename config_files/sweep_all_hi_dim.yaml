@@ -1,0 +1,23 @@
+project: dmae
+program: train_ae.py
+command:
+  - /gpfs/gibbs/pi/krishnaswamy_smita/xingzhi/.conda_envs/geosink/bin/python
+  - ${program}
+  - ${args_no_hyphens}
+method: grid
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  model.emb_dim: 
+    values: [10]
+  model.dist_contr_recon_weights:
+    # values: [[0.5,0,0.5],[0,0,1],[1,0,0]]
+    values: [[0.5,0,0.5]]
+    # values: [[1,0,0]]
+  data.root: 
+    values: ['../../data/hgsae2/']
+  data.name:
+    # values: ['merfish_data_for_ae_pca']
+    # values: ['merfish_data_for_ae_pca_log001p_dist_subset','merfish_data_for_ae_pca_subset','merfish_data_for_ae_pca_subset_hamming','merfish_data_for_ae_xor_bitwise_pca_subset']
+    values: ['H21.33.028.Cx28.MTG.02.007.1.02.02.h5ad','H21.33.032.CX24.MTG.02.007.1.01.04.h5ad','H21.33.023.Cx26.MTG.02.007.1.03.05.h5ad','H20.33.025.Cx28.MTG.02.007.1.01.02.h5ad','H20.33.035.Cx26.MTG.02.007.1.01.03.h5ad','H20.33.001.CX28.MTG.02.007.1.02.02.h5ad','H20.33.004.Cx26.MTG.02.007.1.01.04.h5ad','H20.33.004.Cx26.MTG.02.007.1.02.03.h5ad','H21.33.021.Cx26.MTG.02.007.1.06.h5ad','H21.33.019.Cx30.MTG.02.007.5.01.02.h5ad','H21.33.016.Cx26.MTG.02.007.3.01.02.h5ad','H21.33.014.CX26.MTG.02.007.1.02.02.h5ad','H21.33.028.Cx28.MTG.02.007.1.02.04.h5ad','H21.33.023.Cx26.MTG.02.007.1.03.01.h5ad','H20.33.044.Cx26.MTG.02.007.1.01.04.h5ad','H21.33.015.Cx26.MTG.02.007.1.2.h5ad','H21.33.025.CX26.MTG.02.007.4.01.06.h5ad','H21.33.012.Cx26.MTG.02.007.1.01.05.h5ad','H21.33.022.Cx26.MTG.02.007.2.M.03.h5ad','H21.33.006.Cx28.MTG.02.007.1.01.09.03.h5ad','H20.33.012.Cx24.MTG.02.007.1.01.01.h5ad','H21.33.011.Cx26.MTG.02.007.3.01.04.h5ad','H21.33.019.Cx30.MTG.02.007.5.01.01.h5ad','H21.33.038.Cx20.MTG.02.007.3.01.02.h5ad','H21.33.023.Cx26.MTG.02.007.1.03.04.h5ad','H21.33.015.Cx26.MTG.02.007.1.0.h5ad','H21.33.005.Cx18.MTG.02.007.02.03.h5ad','H21.33.025.CX26.MTG.02.007.4.01.04.h5ad','H20.33.001.CX28.MTG.02.007.1.02.03.h5ad','H21.33.011.Cx26.MTG.02.007.3.01.06.h5ad','H21.33.015.Cx26.MTG.02.007.1.1.h5ad','H20.33.035.Cx26.MTG.02.007.1.01.04.h5ad','H21.33.021.Cx26.MTG.02.007.1.04.h5ad','H21.33.012.Cx26.MTG.02.007.1.01.06.h5ad','H20.33.025.Cx28.MTG.02.007.1.01.04.h5ad','H20.33.004.Cx26.MTG.02.007.1.01.05.h5ad','H21.33.006.Cx28.MTG.02.007.1.01.09.04.h5ad','H20.33.025.Cx28.MTG.02.007.1.01.06.h5ad','H21.33.022.Cx26.MTG.02.007.2.M.04.h5ad','H20.33.001.Cx28.MTG.02.007.1.01.03.h5ad','H21.33.038.Cx20.MTG.02.007.3.01.04.h5ad','H21.33.012.Cx26.MTG.02.007.1.01.04.h5ad','H21.33.028.CX28.MTG.02.007.1.01.01.h5ad','H21.33.016.Cx26.MTG.02.007.3.01.01.h5ad','H20.33.040.Cx25.MTG.02.007.1.01.03.h5ad','H21.33.016.Cx26.MTG.02.007.3.01.03.h5ad','H20.33.044.Cx26.MTG.02.007.1.01.02.h5ad','H20.33.012.Cx24.MTG.02.007.1.03.03.h5ad','H21.33.011.Cx26.MTG.02.007.3.01.05.h5ad','H20.33.004.Cx26.MTG.02.007.1.02.04.h5ad','H21.33.022.Cx26.MTG.02.007.2.M.02.h5ad','H21.33.005.Cx18.MTG.02.007.02.04.h5ad','H21.33.025.CX26.MTG.02.007.4.01.02.h5ad','H21.33.006.Cx28.MTG.02.007.1.01.09.02.h5ad','H20.33.040.Cx25.MTG.02.007.1.01.04.h5ad','H20.33.044.Cx26.MTG.02.007.1.01.03.h5ad','H21.33.013.Cx24.MTG.02.007.1.06.h5ad','H20.33.012.Cx24.MTG.02.007.1.03.02.h5ad','H20.33.004.Cx26.MTG.02.007.1.02.02.h5ad']
