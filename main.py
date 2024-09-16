@@ -33,8 +33,8 @@ def return_graph_data(adata):
 # for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --vendi_score_subset 3000 --lin_prob_target braak --wavelets 0
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--data_dir', type=str, default='./data/interim/section_data')
-    argparser.add_argument('--output_dir', type=str, default='.data/processed/wavelet_features')
+    argparser.add_argument('--data_dir', type=str, default='./data/interim/section_data/')
+    argparser.add_argument('--output_dir', type=str, default='./data/processed/wavelet_features/')
     argparser.add_argument('--k_hop', type=int, default=1)
     argparser.add_argument('--hyperedge_features', nargs='+', default = ['cell_type_hist', 'gene_expression', 'gene_correlation', 'diffused_gene_correlation'], type=str)
     argparser.add_argument('--vendi_score_subset', type=int, default=-1)
