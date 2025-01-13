@@ -1,4 +1,4 @@
-name: hypergraph
+name: hypergraph2
 channels:
   - pyg
   - pytorch

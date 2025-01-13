@@ -8,7 +8,7 @@ import scanpy as sc
 import torch
 from torch_geometric.utils.convert import from_networkx
 
-from dhg import Hypergraph
+#from dhg import Hypergraph
 
 from src.hypergraphs.featurizers import get_hyperedge_features
 from src.models.hsn_pyg import HSN
@@ -68,7 +68,8 @@ if __name__ == '__main__':
         data = return_graph_data(adata)
 
         original_dataset = [data]
-        to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, k_hop) # what should k be? 3?
+        #to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, k_hop) # what should k be? 3?
+        to_hg_func = lambda g: g
         dataset = HGDataset(original_dataset, to_hg_func)
         # honestly gpu speed up is incremental
         model = HSN(in_channels=180, 
