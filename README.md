@@ -6,7 +6,9 @@ The used conda environment can be found at ```environment.yml``` and used with t
 
 ```conda env create -f environment.yml ```
 
+Once the environment is created you just need to activate it by:
 
+```conda activate hypergraph```
 
 ## Dataset download
 
