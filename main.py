@@ -6,31 +6,17 @@ import anndata as ad
 import scanpy as sc
 
 import torch
-from torch_geometric.utils.convert import from_networkx
-
 from dhg import Hypergraph
 
 from src.hypergraphs.featurizers import get_hyperedge_features
 from src.models.hsn_pyg import HSN
 from src.utils.hypergraph_utils import HGDataset
-from src.graphs.graph_build import create_graph
+from src.graphs.builder import return_graph_data
 
-
-    
-def return_graph_data(adata):
-    # do log normalization
-    sc.pp.normalize_total(adata, target_sum=1e4)
-    sc.pp.log1p(adata)
-
-    #create the graph. modes are voronoi or knn
-    G = create_graph(adata,mode='voronoi')
-    
-    data = from_networkx(G)
-    data.x = torch.tensor(adata.X, dtype=torch.float)
-    return data
 
 # my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1  --vendi_score_subset 3000 --lin_prob_target braak
 # for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --vendi_score_subset 3000 --lin_prob_target braak --wavelets 0
+
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--data_dir', type=str, default='./data/interim/section_data/')
