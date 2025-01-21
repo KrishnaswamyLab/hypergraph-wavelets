@@ -14,8 +14,8 @@ from src.utils.hypergraph_utils import HGDataset
 from src.graphs.builder import return_graph_data
 
 
-# my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1  --vendi_score_subset 3000
-# for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --vendi_score_subset 3000 --wavelets 0
+# my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1 
+# for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --wavelets 0
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
@@ -23,7 +23,6 @@ if __name__ == '__main__':
     argparser.add_argument('--output_dir', type=str, default='data/processed/wavelet_features/')
     argparser.add_argument('--k_hop', type=int, default=1)
     argparser.add_argument('--hyperedge_features', nargs='+', default = ['cell_type_hist', 'gene_expression', 'gene_correlation', 'diffused_gene_correlation'], type=str)
-    argparser.add_argument('--vendi_score_subset', type=int, default=-1)
     argparser.add_argument('--seed', type=int, default=0)
     argparser.add_argument('--wavelets', type=int, default=1)
     args = argparser.parse_args()
@@ -33,7 +32,6 @@ if __name__ == '__main__':
 
     k_hop = args.k_hop
     hyperedge_features_list = args.hyperedge_features
-    vendi_score_subset = args.vendi_score_subset
 
     print(OUTPUT_DIR)
     print(k_hop)
