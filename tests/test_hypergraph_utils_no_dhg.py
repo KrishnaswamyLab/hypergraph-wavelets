@@ -3,12 +3,21 @@ import torch
 from torch_geometric.data import Data
 from src.utils.hypergraph_utils_no_dhg import data_to_hg, get_hyperedge_index_from_edges  # Import the actual functions
 
+import sys
+import os
+
+# Add the src directory to sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+
+
 @pytest.fixture
 def sample_data():
     """Fixture to provide sample graph data."""
+    # this is a graph with 5 nodes and 5 edges
+    # (0, 1), (0, 3), (0, 4), (1, 2), (2, 3)
     return Data(
         x=torch.rand((5, 3)),  # 5 nodes with 3 features each
-        edge_index=torch.tensor([[0, 1, 2, 3, 4, 0], [1, 2, 3, 4, 0, 2]], dtype=torch.long)
+        edge_index=torch.tensor([[0, 0, 0, 1, 2,], [1, 3, 4, 2, 3]], dtype=torch.long)
     )
 
 def test_data_to_hg_no_k_hop(sample_data):

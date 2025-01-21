@@ -24,22 +24,21 @@ from torch_geometric.data.hypergraph_data import HyperGraphData
 from torch_geometric.data import Dataset
 from tqdm import tqdm
 
-def data_to_hg(data, add_k_hop=0, min_k_hop_size=0):
+def data_to_hg(data, add_k_hop=1):
     edge_index_undirected = to_undirected(data.edge_index)
-    unique_edges = edge_index_undirected.t().tolist()
-
-    edges_as_tuples = [(int(edge[0]), int(edge[1])) for edge in unique_edges]
-    if add_k_hop:
-        hyperedges = []
-        for node in range(data.num_nodes):
-            subset, sub_edge_index, _, _ = k_hop_subgraph(
-                node_idx=node, num_hops=add_k_hop, edge_index=edge_index_undirected, relabel_nodes=True
-            )
-            if len(subset) > min_k_hop_size:
-                hyperedges.append(subset.tolist())
-        edges_as_tuples += hyperedges
+    hyperedges = [] 
     
-    hyperedge_index = get_hyperedge_index_from_edges(edges_as_tuples)
+    for node_idx in range(data.num_nodes):
+        # first check if node_idx is in the graph. For some reason the mismatch appears to be very large!
+        if node_idx not in edge_index_undirected[0]:
+            print(f'Node {node_idx} not in graph, skipping.")')
+            continue
+        subset, _, _, _ = k_hop_subgraph(
+            node_idx=node_idx, num_hops=add_k_hop, edge_index=edge_index_undirected, relabel_nodes=False
+        )
+        hyperedges.append(subset.tolist())
+
+    hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
     return HyperGraphData(x=data.x, edge_index=hyperedge_index, y=data.y)
 
 def get_hyperedge_index_from_edges(hyperedges):
@@ -186,21 +185,21 @@ class CliqueHyperEdgeTransform(BaseTransform):
     def __repr__(self):
         return f"CliqueHyperEdgeTransform"
 
-if __name__ == '__main__': 
-    # visualize converting an ER graph into a hypergraph with the desired features
+# if __name__ == '__main__': 
+#     # visualize converting an ER graph into a hypergraph with the desired features
 
-    # Create a random graph using NetworkX
-    G = nx.fast_gnp_random_graph(10, 0.3)  # Generate a random graph with 10 nodes and edge probability 0.3
+#     # Create a random graph using NetworkX
+#     G = nx.fast_gnp_random_graph(10, 0.3)  # Generate a random graph with 10 nodes and edge probability 0.3
 
-    # Visualize the generated graph (optional)
-    nx.draw(G, with_labels=True)
-    plt.show()
+#     # Visualize the generated graph (optional)
+#     nx.draw(G, with_labels=True)
+#     plt.show()
 
-    # Convert NetworkX graph to PyTorch Geometric data object
-    data = from_networkx(G)
+#     # Convert NetworkX graph to PyTorch Geometric data object
+#     data = from_networkx(G)
 
-    hg = data_to_hg(data, add_k_hop=1, min_k_hop_size = 3)
-    hg.draw()
+#     hg = data_to_hg(data, add_k_hop=1, min_k_hop_size = 3)
+#     hg.draw()
 
 
 def get_hyperedge_index(HG):
@@ -280,3 +279,47 @@ class HGDatasetFromDGL(Dataset):
 
     def get(self, idx):
         return self.data_list[idx]
+
+
+if __name__ == "__main__":
+    def sample_data_func():
+        """Fixture to provide sample graph data."""
+        # this is a graph with 5 nodes and 5 edges
+        # (0, 1), (0, 3), (0, 4), (1, 2), (2, 3)
+        return Data(
+            x=torch.rand((5, 3)),  # 5 nodes with 3 features each
+            edge_index=torch.tensor([[0, 0, 0, 1, 2,], [1, 3, 4, 2, 3]], dtype=torch.long)
+        )
+
+    sample_data = sample_data_func()
+
+    def test_data_to_hg_with_k_hop(sample_data):
+        """Test data_to_hg with 1-hop addition."""
+        hg = data_to_hg(sample_data, add_k_hop=1)
+        assert hg.edge_index.shape[1] > sample_data.edge_index.shape[1]
+        print(hg.edge_index)
+        assert (hg.edge_index[1,:] == 0).sum() == 4 # 0's k hop neighborhood has 4 elements
+        assert (hg.edge_index[1,:] == 1).sum() == 3
+        assert (hg.edge_index[1,:] == 2).sum() == 3
+        assert (hg.edge_index[1,:] == 3).sum() == 3
+        assert (hg.edge_index[1,:] == 4).sum() == 2
+
+    def test_get_hyperedge_index_from_edges():
+        """Test hyperedge index creation."""
+        hyperedges = [[0, 1, 2], [3, 4]]
+        hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
+        assert hyperedge_index.shape == (2, 5)
+        assert hyperedge_index.tolist() == [[0, 1, 2, 3, 4], [0, 0, 0, 1, 1]]
+
+    def test_create_HGDataset():
+        """Test HGDataset creation."""
+        dataset = [sample_data, sample_data]
+        hg_dataset = HGDataset(dataset, data_to_hg)
+        assert len(hg_dataset) == 2
+        assert isinstance(hg_dataset.get(0), HyperGraphData)
+        # print the first hypergraph's edge index
+        print(hg_dataset.get(0).edge_index)
+
+    test_data_to_hg_with_k_hop(sample_data)
+    test_create_HGDataset()
+    
