@@ -14,18 +14,19 @@ from src.utils.hypergraph_utils import HGDataset
 from src.graphs.builder import return_graph_data
 
 
-# my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1  --vendi_score_subset 3000
-# for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --vendi_score_subset 3000 --wavelets 0
+# my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1 
+# for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --wavelets 0
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--data_dir', type=str, default='data/interim/')
-    argparser.add_argument('--output_dir', type=str, default='data/processed/wavelet_features/')
+    argparser.add_argument('--data_dir', type=str, default='data/interim')
+    argparser.add_argument('--output_dir', type=str, default='data/processed/wavelet_features')
     argparser.add_argument('--k_hop', type=int, default=1)
-    argparser.add_argument('--hyperedge_features', nargs='+', default = ['cell_type_hist', 'gene_expression', 'gene_correlation', 'diffused_gene_correlation'], type=str)
-    argparser.add_argument('--vendi_score_subset', type=int, default=-1)
+    argparser.add_argument('--hyperedge_features', nargs='+', default = ['gene_expression', 'gene_correlation', 'diffused_gene_correlation'], type=str)
     argparser.add_argument('--seed', type=int, default=0)
     argparser.add_argument('--wavelets', type=int, default=1)
+    argparser.add_argument('--norm_target_sum', type=int, default=1e4)
+    
     args = argparser.parse_args()
 
     DATA_DIR = args.data_dir
@@ -33,10 +34,9 @@ if __name__ == '__main__':
 
     k_hop = args.k_hop
     hyperedge_features_list = args.hyperedge_features
-    vendi_score_subset = args.vendi_score_subset
+    norm_target_sum = args.norm_target_sum
 
     print(OUTPUT_DIR)
-    print(k_hop)
     
     if os.path.isdir(OUTPUT_DIR) == False:
         os.mkdir(OUTPUT_DIR)
@@ -44,30 +44,36 @@ if __name__ == '__main__':
         raise ValueError('Data directory does not exist')
 
     datasets = os.listdir(DATA_DIR)
+
+    print(datasets)
+
     for dataset_name in tqdm(datasets):
         ######################################
         # LOAD IN DATA AND PREPARE MODEL
         ######################################
-        print(os.path.join(DATA_DIR,dataset_name))
-        adata = ad.read_h5ad(os.path.join(DATA_DIR,dataset_name))
-        data = return_graph_data(adata)
+        dataset_path = os.path.join(DATA_DIR,dataset_name)
+        print(dataset_name)
+        adata = ad.read_h5ad(dataset_path)
+        data = return_graph_data(adata,norm_target_sum=norm_target_sum)
 
         original_dataset = [data]
+
         to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, k_hop) # what should k be? 3?
+
         dataset = HGDataset(original_dataset, to_hg_func)
-        # honestly gpu speed up is incremental
+
         model = HSN(in_channels=180, 
-              hidden_channels=16,
-              out_channels = 1, 
-              trainable_laziness = False,
-              trainable_scales = False, 
-              activation = None, # just get one layer of wavelet transform 
-              fixed_weights=True, 
-              layout=['hsm'], 
-              normalize='right', 
-              pooling='max',
-              task = 'node_representation',
-              scale_list = [0,1,2,4,8] #1,2,4,8,16
+                    hidden_channels=16,
+                    out_channels = 1, 
+                    trainable_laziness = False,
+                    trainable_scales = False, 
+                    activation = None, # just get one layer of wavelet transform 
+                    fixed_weights=True, 
+                    layout=['hsm'], 
+                    normalize='right', 
+                    pooling='max',
+                    task = 'node_representation',
+                    scale_list = [0,1,2,4,8] #1,2,4,8,16
         )
         model.eval()
 
@@ -84,6 +90,7 @@ if __name__ == '__main__':
 
         # get the features for the hyperedges
         #hyperedge_features_list = ['cell_type_hist', 'gene_expression', 'gene_correlation', 'diffused_gene_correlation']
+
         args_dict = {'num_diffusions': 1, 'correlation_pairs': [(0,1), (0,2), (1,2)]}
         # TODO
         # correlation values in hyperedge (choose some), 
@@ -112,11 +119,5 @@ if __name__ == '__main__':
         else:
             node_feat = hyperedge_features
 
-        torch.save(node_feat, os.path.join(DATA_DIR,dataset_name,'_neighborhood_feat.pt'))
-
-      
-
-
-
-
-
+        torch_save_dir = os.path.join(OUTPUT_DIR, dataset_name.split('.')[0] + '_neighborhood_feat.pt')
+        torch.save(node_feat, torch_save_dir)
