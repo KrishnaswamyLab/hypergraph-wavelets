@@ -14,26 +14,25 @@ from src.utils.hypergraph_utils import HGDataset
 from src.graphs.builder import return_graph_data
 
 
-# my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1  --vendi_score_subset 3000 --lin_prob_target braak
-# for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --vendi_score_subset 3000 --lin_prob_target braak --wavelets 0
+# my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1  --vendi_score_subset 3000
+# for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --vendi_score_subset 3000 --wavelets 0
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--data_dir', type=str, default='./data/interim/section_data/')
-    argparser.add_argument('--output_dir', type=str, default='./data/processed/wavelet_features/')
+    argparser.add_argument('--data_dir', type=str, default='data/interim/')
+    argparser.add_argument('--output_dir', type=str, default='data/processed/wavelet_features/')
     argparser.add_argument('--k_hop', type=int, default=1)
     argparser.add_argument('--hyperedge_features', nargs='+', default = ['cell_type_hist', 'gene_expression', 'gene_correlation', 'diffused_gene_correlation'], type=str)
     argparser.add_argument('--vendi_score_subset', type=int, default=-1)
-    argparser.add_argument('--lin_prob_target', type = str, default = 'braak')
     argparser.add_argument('--seed', type=int, default=0)
     argparser.add_argument('--wavelets', type=int, default=1)
     args = argparser.parse_args()
 
     DATA_DIR = args.data_dir
     OUTPUT_DIR = args.output_dir
+
     k_hop = args.k_hop
     hyperedge_features_list = args.hyperedge_features
-    lin_prob_target = args.lin_prob_target
     vendi_score_subset = args.vendi_score_subset
 
     print(OUTPUT_DIR)
@@ -49,8 +48,8 @@ if __name__ == '__main__':
         ######################################
         # LOAD IN DATA AND PREPARE MODEL
         ######################################
-        print(DATA_DIR + dataset_name)
-        adata = ad.read_h5ad(DATA_DIR + dataset_name)
+        print(os.path.join(DATA_DIR,dataset_name))
+        adata = ad.read_h5ad(os.path.join(DATA_DIR,dataset_name))
         data = return_graph_data(adata)
 
         original_dataset = [data]
@@ -112,7 +111,8 @@ if __name__ == '__main__':
             # save the features (node_feat are the NEIGHBORHOOD features)
         else:
             node_feat = hyperedge_features
-        torch.save(node_feat, OUTPUT_DIR + dataset_name + '_neighborhood_feat.pt')
+
+        torch.save(node_feat, os.path.join(DATA_DIR,dataset_name,'_neighborhood_feat.pt'))
 
       
 
