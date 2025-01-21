@@ -654,9 +654,10 @@ def create_knn_graph(adata,K=10):
     return G
 
 
-def return_graph_data(adata):
+def return_graph_data(adata,norm_target_sum=1e4):
+
     # do log normalization
-    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.normalize_total(adata, target_sum=norm_target_sum)
     sc.pp.log1p(adata)
 
     #create the graph. modes are voronoi or knn
