@@ -7,9 +7,10 @@ import scprep
 from torch_geometric.utils.convert import from_networkx
 from dhg import Hypergraph
 import sys
+
 sys.path.append('..')
-from utils.hypergraph_utils import HGDataset
-from models.hsn_pyg import HyperScatteringModule
+from .hypergraph_utils import HGDataset
+from src.models.hsn_pyg import HyperScatteringModule
 
 def get_hyperedge_pos_df(hgdataset, coordinates):
     ei = hgdataset.edge_index
