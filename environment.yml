@@ -29,6 +29,7 @@ dependencies:
   - anndata
   - scanpy
   - tqdm
+  - pytorch-scatter
   - pip:
     - einops
     - optuna
