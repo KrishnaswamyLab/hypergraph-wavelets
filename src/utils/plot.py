@@ -118,3 +118,21 @@ def get_wv_plots(G, X_data, coordinates, num_hops=1, graph_info='', device='cpu'
     scprep.plot.scatter2d(coordinates, c=init_node_sig.cpu().numpy(), cmap='viridis')
     plt.show()
     return dataset
+
+def get_hyperedge_pos_feature_df(hgdataset,coordinates, feature_df, feature_name):
+    ei = hgdataset.edge_index
+    eidf = pd.DataFrame(ei.T.numpy(), columns=['node_idx', 'he_idx'])
+    eidf[['x', 'y']] = coordinates[eidf['node_idx'].values, :]
+    eidf[feature_name] = feature_df[eidf['node_idx'].values].to_numpy()
+
+    return eidf
+
+def group_features(df, feature_name, factor=0.1):
+    features = []
+
+    for set_index, group in df.groupby('he_idx'):
+
+        max_cell_class = group[feature_name].max()
+
+        features.append(max_cell_class)
+    return features
