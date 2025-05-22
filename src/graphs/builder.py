@@ -16,15 +16,55 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import warnings
 from scipy.spatial import Delaunay
+import scanpy as sc
 
 from geovoronoi import voronoi_regions_from_coords
 from shapely import geometry
 
 from sklearn.neighbors import kneighbors_graph
 
+import torch
+from torch_geometric.utils.convert import from_networkx
+
 RADIUS_RELAXATION = 0.1
 NEIGHBOR_EDGE_CUTOFF = 55  # distance cutoff for neighbor edges, 55 pixels~20 um
 
+def plot_graph(pos, edge_index, cell_type, sample, ax=None):
+    pos = pos.numpy()
+    edge_index = edge_index.numpy()
+    cell_type = cell_type.numpy()
+
+    # Create a graph
+    G = nx.Graph()
+
+    # Add nodes with positions
+    for i in range(pos.shape[0]):
+        G.add_node(i, pos=pos[i], cell_type=cell_type[i])
+
+    # Add edges
+    for i in range(edge_index.shape[1]):
+        G.add_edge(edge_index[0, i], edge_index[1, i])
+
+    # Extract positions
+    node_pos = nx.get_node_attributes(G, 'pos')
+
+    # Use provided Axes or create new one
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+    # Draw nodes
+    nx.draw_networkx_nodes(G, node_pos, node_color=cell_type, cmap=plt.get_cmap('viridis'), node_size=1, ax=ax)
+
+    # Draw edges
+    nx.draw_networkx_edges(G, node_pos, alpha=0.3, ax=ax)
+
+    ax.set_xlabel('Spatial coordinate 1')
+    ax.set_ylabel('Spatial coordinate 2')
+    ax.set_title('Sample: ' + sample)
+    # plt.colorbar(plt.cm.ScalarMappable(cmap='viridis'), label='Cell Type')
+
+    if ax is None:
+        plt.show()
 
 def plot_voronoi_polygons(voronoi_polygons, voronoi_polygon_colors=None):
     """Plot voronoi polygons for the cellular graph
@@ -613,3 +653,16 @@ def create_knn_graph(adata,K=10):
     G = nx.from_numpy_array(A)
     return G
 
+
+def return_graph_data(adata,norm_target_sum=1e4):
+
+    # do log normalization
+    sc.pp.normalize_total(adata, target_sum=norm_target_sum)
+    sc.pp.log1p(adata)
+
+    #create the graph. modes are voronoi or knn
+    G = create_graph(adata,mode='voronoi')
+    
+    data = from_networkx(G)
+    data.x = torch.tensor(adata.X, dtype=torch.float)
+    return data

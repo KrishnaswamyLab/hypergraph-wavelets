@@ -2,7 +2,14 @@
 
 ## Conda environment
 We recommend the usage of a conda environment for running the experiments.
-The used conda environment can be found at ```environment.yml```
+The used conda environment can be found at ```environment.yml``` and used with the command (The created environment is called hypegraph):
+
+```conda env create -f environment.yml ```
+
+Once the environment is created you just need to activate it by:
+
+```conda activate hypergraph```
+
 ## Dataset download
 
 The data can be downloaded on the following link: https://sea-ad-spatial-transcriptomics.s3.amazonaws.com/index.html#middle-temporal-gyrus/all_donors-h5ad/

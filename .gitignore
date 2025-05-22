@@ -164,7 +164,6 @@ data/interim/section_data/*
 data/processed/wavelet_features/*
 data/raw/*
 
-
 .DS_Store
 *.h5ad
 
