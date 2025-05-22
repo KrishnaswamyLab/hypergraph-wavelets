@@ -13,9 +13,9 @@ from sklearn.metrics import f1_score
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--data_dir', type=str, default='/vast/palmer/pi/krishnaswamy_smita/jcr222/hypergraphs/data/')
-    argparser.add_argument('--wavelet_feature_dir', type=str, default='wavelet_features/')
-    argparser.add_argument('--lin_prob_target', type = str, default = 'Braak')
+    argparser.add_argument('--data_dir', type=str, default='data/interim/')
+    argparser.add_argument('--wavelet_feature_dir', type=str, default='data/processed/wavelet_features/1_hop/')
+    argparser.add_argument('--lin_prob_target', type = str, default = 'response_binary')
     argparser.add_argument('--seed', type=int, default=0)
     argparser.add_argument('--wavelets', type=int, default=1)
     argparser.add_argument('--pts_per_dataset', type=int, default=1000)
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     datasets = os.listdir(DATA_DIR)
     num_datasets = len(datasets)
     print(f'Number of datasets: {num_datasets}')
-    example_features = torch.load(FEATURE_DIR + datasets[0] + save_end, weights_only=True)
+    example_features = torch.load(os.path.join(FEATURE_DIR, datasets[0].split('.')[0] + save_end), weights_only=True)
     num_features = example_features.shape[1]
     del example_features
 
@@ -39,11 +39,11 @@ if __name__ == '__main__':
     labels = np.zeros((num_datasets, points_per_dataset))
     label_dict = {}
     for ind, dataset_name in enumerate(datasets):
-        print(DATA_DIR + dataset_name)
         adata = ad.read_h5ad(DATA_DIR + dataset_name)
 
         # load in the wavelet features
-        hyperedge_feat = torch.load(FEATURE_DIR + dataset_name + save_end, weights_only=True)
+        hyperedge_feat = torch.load(os.path.join(FEATURE_DIR, dataset_name.split('.')[0] + save_end), weights_only=True)
+
         print(f'num features: {hyperedge_feat.shape[1]}')
 
         if hyperedge_feat.shape[1] != num_features:
@@ -55,7 +55,7 @@ if __name__ == '__main__':
         hyperedge_feat = hyperedge_feat.detach().numpy()
         hyperedge_feat = np.nan_to_num(hyperedge_feat)
         # randomly sample points_per_dataset points
-        idx = np.random.choice(hyperedge_feat.shape[0], points_per_dataset, replace=False)
+        idx = np.random.choice(hyperedge_feat.shape[0], points_per_dataset, replace=True)
         hyperedge_feat = hyperedge_feat[idx, :]
         dataset_labels = adata.obs[lin_prob_target].values
         dataset_labels = dataset_labels[idx]

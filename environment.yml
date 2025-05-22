@@ -31,9 +31,9 @@ dependencies:
   - pip:
     - einops
     - optuna
-    - dhg
+    # - dhg
     - matplotlib==3.9.0
-    - dhg==0.9.4
+    # - dhg==0.9.4
     - geovoronoi==0.4.0
     - graphtools==1.5.3
     - optuna==3.6.1
