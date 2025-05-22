@@ -47,14 +47,4 @@ dependencies:
     - pandas==2.0.3
     - phate==1.0.11
     - scprep==1.2.3
-   # Utilities and infrastructure
-    # - s-gd2==1.8.1
-    # - sqlalchemy==2.0.31
-    # - tasklogger==1.2.0
-    # - wrapt==1.16.0
-    # - tqdm>=4.65.0
-
-    # - pygsp==0.5.1
-    # - s-gd2==1.8.1
-    # - shapely==2.0.4
  
