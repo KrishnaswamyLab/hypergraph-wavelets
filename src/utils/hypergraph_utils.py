@@ -1,44 +1,53 @@
-from torch_geometric.utils import to_undirected
-import dhg 
-import torch
-from torch_geometric.utils import from_networkx
-from torch_geometric.transforms import BaseTransform
-
-import torch_geometric
-import tqdm
-
+from tqdm import tqdm
 from functools import partial
-
 from multiprocessing import Pool
 
-import torch.multiprocessing as mp
-
-
-import networkx as nx
-import matplotlib.pyplot as plt
-
 import torch
+import torch_geometric
+
+from torch_geometric.data import Data
 from torch_geometric.data.hypergraph_data import HyperGraphData
 from torch_geometric.data import Dataset
-from dhg import Graph, Hypergraph
-from tqdm import tqdm
 
-def data_to_hg(data, add_k_hop = 0, min_k_hop_size = 0):
+from torch_geometric.transforms import BaseTransform
+from torch_geometric.utils import to_undirected
+from torch_geometric.utils import to_undirected, k_hop_subgraph
+
+
+def data_to_hg(data, add_k_hop=1):
     edge_index_undirected = to_undirected(data.edge_index)
-    unique_edges = edge_index_undirected.t().tolist()
+    hyperedges = [] 
+    
+    for node_idx in range(data.num_nodes):
+        # first check if node_idx is in the graph. For some reason the mismatch appears to be very large!
+        if node_idx not in edge_index_undirected[0]:
+            print(f'Node {node_idx} not in graph, skipping.")')
+            continue
+        subset, _, _, _ = k_hop_subgraph(
+            node_idx=node_idx, num_hops=add_k_hop, edge_index=edge_index_undirected, relabel_nodes=False
+        )
+        hyperedges.append(subset.tolist())
 
-    edges_as_tuples = [(int(edge[0]), int(edge[1])) for edge in unique_edges]
-    if add_k_hop:
-        g = dhg.Graph(data.num_nodes, edges_as_tuples)
-        hg_k_hop = dhg.Hypergraph.from_graph_kHop(g, k = add_k_hop)
-        hyperedges = hg_k_hop.e 
-        if min_k_hop_size > 0:
-            hyperedges_filtered = [edge for edge in hyperedges[0] if len(edge) > min_k_hop_size]
-            edges_as_tuples = edges_as_tuples + hyperedges_filtered
-        else:
-            edges_as_tuples = edges_as_tuples + hyperedges[0]
-    hg = dhg.Hypergraph(data.num_nodes, edges_as_tuples)
-    return hg
+    hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
+    return HyperGraphData(x=data.x, edge_index=hyperedge_index, y=data.y)
+
+def get_hyperedge_index_from_edges(hyperedges):
+    """
+    Convert a list of hyperedges to a hyperedge index tensor.
+    
+    Args:
+        hyperedges (list of list of int): List of hyperedges where each hyperedge is a list of node indices.
+    
+    Returns:
+        torch.Tensor: Hyperedge index tensor.
+    """
+    flattened_list = []
+    index_list = []
+    for i, hyperedge in enumerate(hyperedges):
+        flattened_list.extend(hyperedge)
+        index_list.extend([i] * len(hyperedge))
+    
+    return torch.tensor([flattened_list, index_list], dtype=torch.long)
 
 def get_clique_from_node( node_idx, graph ):
     subnodes, subgraph_edges, _, _ = torch_geometric.utils.k_hop_subgraph(node_idx = node_idx, num_hops = 1, edge_index = graph.edge_index)
@@ -115,7 +124,7 @@ def get_cliques_planar(graph, njobs = 1):
     three_cliques_list = []
 
 
-    for node_idx in tqdm.tqdm(range(graph.x.shape[0])):
+    for node_idx in tqdm(range(graph.x.shape[0])):
 
         subnodes, subgraph_edges, _, _ = torch_geometric.utils.k_hop_subgraph(node_idx = node_idx, num_hops = 1, edge_index = graph.edge_index)
         periph_nodes = subnodes[subnodes != node_idx]
@@ -166,21 +175,21 @@ class CliqueHyperEdgeTransform(BaseTransform):
     def __repr__(self):
         return f"CliqueHyperEdgeTransform"
 
-if __name__ == '__main__': 
-    # visualize converting an ER graph into a hypergraph with the desired features
+# if __name__ == '__main__': 
+#     # visualize converting an ER graph into a hypergraph with the desired features
 
-    # Create a random graph using NetworkX
-    G = nx.fast_gnp_random_graph(10, 0.3)  # Generate a random graph with 10 nodes and edge probability 0.3
+#     # Create a random graph using NetworkX
+#     G = nx.fast_gnp_random_graph(10, 0.3)  # Generate a random graph with 10 nodes and edge probability 0.3
 
-    # Visualize the generated graph (optional)
-    nx.draw(G, with_labels=True)
-    plt.show()
+#     # Visualize the generated graph (optional)
+#     nx.draw(G, with_labels=True)
+#     plt.show()
 
-    # Convert NetworkX graph to PyTorch Geometric data object
-    data = from_networkx(G)
+#     # Convert NetworkX graph to PyTorch Geometric data object
+#     data = from_networkx(G)
 
-    hg = data_to_hg(data, add_k_hop=1, min_k_hop_size = 3)
-    hg.draw()
+#     hg = data_to_hg(data, add_k_hop=1, min_k_hop_size = 3)
+#     hg.draw()
 
 
 def get_hyperedge_index(HG):
@@ -203,28 +212,12 @@ def get_hyperedge_index(HG):
 
     return hyperedge_index
 
+# Remaining functions remain the same with minor modifications if necessary
 def get_HyperGraphData(HG, node_features, hyperedge_attr, labels, other_data=None):
     """
-    Get the HyperGraphData class from a hypergraph object and the corresponding node features, hyperedge attributes and labels.
-    
-    Args:
-        HG: Hypergraph object
-        node_features (torch.Tensor, optional): Node feature matrix with shape
-            :obj:`[num_nodes, num_node_features]`. (default: :obj:`None`)
-        hyperedge_attr (torch.Tensor, optional): Edge feature matrix with shape
-            :obj:`[num_edges, num_edge_features]`.
-            (default: :obj:`None`)
-        labels (torch.Tensor, optional): Graph-level or node-level ground-truth
-            labels with arbitrary shape. (default: :obj:`None`)
-        other_data (dict, optional): Dictionary of additional data. (default: :obj:`None`)
-    
-    Returns:
-        a HyperGraphData object
+    Modified to use the new hyperedge index tensor.
     """
-    hyperedge_index = get_hyperedge_index(HG)
-    # disregard edge_attr for the time being
-    # should be edge_attr = hyperedge_attr, but I'm setting it to none for now
-    data = HyperGraphData(x=node_features, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=labels)
+    data = HyperGraphData(x=node_features, edge_index=HG.edge_index, edge_attr=hyperedge_attr, y=labels)
     if other_data is not None:
         for key in other_data.keys():
             data[key] = other_data[key]
@@ -232,25 +225,10 @@ def get_HyperGraphData(HG, node_features, hyperedge_attr, labels, other_data=Non
                 data['y'] = other_data[key]
     return data
 
-def get_HG_data_list(original_dataset, to_hg_func=lambda g: Hypergraph.from_graph_kHop(g, k=1)):
+def get_HG_data_list(original_dataset, to_hg_func=data_to_hg):
     hgdataset = []
     for graph_dat in tqdm(original_dataset, desc='Converting to hypergraph data'):
-        edge_list = graph_dat.edge_index.t() if 'edge_index' in graph_dat.keys() else None
-        num_vertices = graph_dat.num_nodes # if 'num_nodes' in graph_dat.keys() else None
-        node_features = graph_dat.x if 'x' in graph_dat.keys() else None
-        labels = graph_dat.y if 'y' in graph_dat.keys() else None
-
-        G = Graph(num_vertices, edge_list)
-        HG1 = to_hg_func(G)
-
-        # Extract all keys other than 'edge_index', 'num_nodes', 'x', 'y'
-        other_keys = [key for key in graph_dat.keys() if key not in ['edge_index', 'num_nodes', 'x', 'y', 'edge_attr']]
-        other_data = {key: graph_dat[key] for key in other_keys}
-        
-        X, lbl = node_features, labels
-        Y = torch.zeros(HG1.num_e, X.shape[1]) # use all zero hyperedge attributes
-        hgdataset.append(get_HyperGraphData(HG1, X, Y, lbl, other_data))
-        #import pdb; pdb.set_trace()
+        hgdataset.append(to_hg_func(graph_dat))
     return hgdataset
 
 class HGDatasetFromHGList(Dataset):
@@ -268,7 +246,7 @@ class HGDatasetFromHGList(Dataset):
         return self.data_list[idx]
 
 class HGDataset(Dataset):
-    def __init__(self, original_dataset, to_hg_func=lambda g: Hypergraph.from_graph_kHop(g, k=1), transform=None, pre_transform=None):
+    def __init__(self, original_dataset, to_hg_func, transform=None, pre_transform=None):
         super(HGDataset, self).__init__('.', transform, pre_transform)
         self.original_dataset = original_dataset
         self.to_hg_func = to_hg_func
@@ -291,3 +269,47 @@ class HGDatasetFromDGL(Dataset):
 
     def get(self, idx):
         return self.data_list[idx]
+
+
+if __name__ == "__main__":
+    def sample_data_func():
+        """Fixture to provide sample graph data."""
+        # this is a graph with 5 nodes and 5 edges
+        # (0, 1), (0, 3), (0, 4), (1, 2), (2, 3)
+        return Data(
+            x=torch.rand((5, 3)),  # 5 nodes with 3 features each
+            edge_index=torch.tensor([[0, 0, 0, 1, 2,], [1, 3, 4, 2, 3]], dtype=torch.long)
+        )
+
+    sample_data = sample_data_func()
+
+    def test_data_to_hg_with_k_hop(sample_data):
+        """Test data_to_hg with 1-hop addition."""
+        hg = data_to_hg(sample_data, add_k_hop=1)
+        assert hg.edge_index.shape[1] > sample_data.edge_index.shape[1]
+        print(hg.edge_index)
+        assert (hg.edge_index[1,:] == 0).sum() == 4 # 0's k hop neighborhood has 4 elements
+        assert (hg.edge_index[1,:] == 1).sum() == 3
+        assert (hg.edge_index[1,:] == 2).sum() == 3
+        assert (hg.edge_index[1,:] == 3).sum() == 3
+        assert (hg.edge_index[1,:] == 4).sum() == 2
+
+    def test_get_hyperedge_index_from_edges():
+        """Test hyperedge index creation."""
+        hyperedges = [[0, 1, 2], [3, 4]]
+        hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
+        assert hyperedge_index.shape == (2, 5)
+        assert hyperedge_index.tolist() == [[0, 1, 2, 3, 4], [0, 0, 0, 1, 1]]
+
+    def test_create_HGDataset():
+        """Test HGDataset creation."""
+        dataset = [sample_data, sample_data]
+        hg_dataset = HGDataset(dataset, data_to_hg)
+        assert len(hg_dataset) == 2
+        assert isinstance(hg_dataset.get(0), HyperGraphData)
+        # print the first hypergraph's edge index
+        print(hg_dataset.get(0).edge_index)
+
+    test_data_to_hg_with_k_hop(sample_data)
+    test_create_HGDataset()
+    
