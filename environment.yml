@@ -1,11 +1,9 @@
 name: hypergraph
 channels:
-  - pyg
-  - pytorch
-  - nvidia
-  - conda-forge
-  - bioconda
   - defaults
+  - conda-forge
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
 dependencies:
   - python=3.9
   - pip

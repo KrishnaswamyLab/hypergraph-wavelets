@@ -22,11 +22,30 @@ from torch_geometric.nn.pool import global_mean_pool
 from torch_geometric.nn import GCNConv 
 from torch_geometric.nn.norm import BatchNorm
 from torch_geometric.nn.conv import MessagePassing
-from .hyper_scattering_net import LazyLayer
+# from .hyper_scattering_net import LazyLayer
 from torch_geometric.utils import scatter, softmax
 from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool, global_add_pool, GlobalAttention
 import pytorch_lightning as pl
 import torchmetrics
+
+
+class LazyLayer(torch.nn.Module):
+    
+    """ Currently a single elementwise multiplication with one laziness parameter per
+    channel. this is run through a softmax so that this is a real laziness parameter
+    """
+
+    def __init__(self, n):
+        super().__init__()
+        self.weights = torch.nn.Parameter(torch.Tensor(2, n))
+
+    def forward(self, x, propogated):
+        inp = torch.stack((x, propogated), dim=1)
+        s_weights = torch.nn.functional.softmax(self.weights, dim=0)
+        return torch.sum(inp * s_weights, dim=-2)
+
+    def reset_parameters(self):
+        torch.nn.init.ones_(self.weights)
 
 class HyperDiffusion(MessagePassing):
     def __init__(

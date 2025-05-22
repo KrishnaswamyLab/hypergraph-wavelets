@@ -6,12 +6,15 @@ import anndata as ad
 import scanpy as sc
 
 import torch
-from dhg import Hypergraph
+
+from torch_geometric.utils.convert import from_networkx
+
+#from dhg import Hypergraph
 
 from src.hypergraphs.featurizers import get_hyperedge_features
 from src.models.hsn_pyg import HSN
-from src.utils.hypergraph_utils import HGDataset
-from src.graphs.builder import return_graph_data
+from src.utils.hypergraph_utils_no_dhg import HGDataset, data_to_hg
+from src.graphs.graph_build import create_graph
 
 
 # my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1 
@@ -59,10 +62,11 @@ if __name__ == '__main__':
 
         original_dataset = [data]
 
-        to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, k_hop) # what should k be? 3?
-
-        dataset = HGDataset(original_dataset, to_hg_func)
-
+        #to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, k_hop) # what should k be? 3?
+        to_hg_func = lambda g: data_to_hg(g, add_k_hop=k_hop)
+        dataset = HGDataset(original_dataset, data_to_hg)
+        # honestly gpu speed up is incremental
+        
         model = HSN(in_channels=180, 
                     hidden_channels=16,
                     out_channels = 1, 
