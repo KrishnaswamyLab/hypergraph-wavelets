@@ -8,8 +8,8 @@ import torch
 
 
 from src.hypergraphs.featurizers import get_hyperedge_features
-from src.models.hyper_scattering_net import HSN
-from src.utils.hypergraph_utils import HGDataset, data_to_hg
+from src.models.hypergraph_scattering import HSN
+from src.hypergraphs.hypergraph_utils import HGDataset, data_to_hg
 from src.graphs.builder import return_graph_data
 
 # my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1 
