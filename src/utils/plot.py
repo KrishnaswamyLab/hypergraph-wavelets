@@ -56,9 +56,58 @@ def plot_hulls(enlarged_hulls, color_values, title='', colormap=plt.cm.viridis, 
     ax.set_yticks([])
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
+
     if show_cbar:
         plt.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=colormap), ax=ax)
     # ax.show()
+    ax.set_aspect('equal')
+    return ax
+
+def plot_hulls_categorical(enlarged_hulls, color_values, categories_values, title='', colormap=plt.cm.viridis, alpha=0.5, ax=None, show_cbar=True):
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    # Convert to numpy arrays if not already
+    color_values = np.array(color_values)
+    categories_values = np.array(categories_values)
+
+    # Create a mapping of unique color values to their respective colors in the colormap
+    unique_colors = np.unique(color_values)
+    color_mapping = {value: colormap(i / max(1, len(unique_colors) - 1)) for i, value in enumerate(unique_colors)}
+
+    # Plot each hull with its corresponding color
+    for hull, color_val in zip(enlarged_hulls, color_values):
+        color = color_mapping[color_val]
+        ax.fill(hull[:, 0], hull[:, 1], color=color, alpha=alpha)
+
+    ax.set_title(title)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel('X Coordinate')
+    ax.set_ylabel('Y Coordinate')
+
+    # Add legend for categories
+    unique_categories = np.unique(categories_values)
+    legend_elements = []
+    
+    for cat in unique_categories:
+        # Find a color value associated with this category (take the first one)
+        mask = categories_values == cat
+        if np.any(mask):
+            color_val = color_values[mask][0]
+            color = color_mapping[color_val]
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                  markerfacecolor=color, markersize=10, label=cat))
+    
+    ax.legend(handles=legend_elements, title="Categories", loc='upper right')
+    
+    if show_cbar and len(unique_colors) > 1:
+        sm = plt.cm.ScalarMappable(cmap=colormap)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax)
+        cbar.set_ticks([0, 1])
+        cbar.set_ticklabels([min(unique_colors), max(unique_colors)])
+    
     ax.set_aspect('equal')
     return ax
 
