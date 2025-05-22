@@ -3,19 +3,14 @@ import os
 import argparse
 from tqdm import tqdm
 import anndata as ad
-import scanpy as sc
 
 import torch
 
-from torch_geometric.utils.convert import from_networkx
-
-#from dhg import Hypergraph
 
 from src.hypergraphs.featurizers import get_hyperedge_features
 from src.models.hsn_pyg import HSN
 from src.utils.hypergraph_utils_no_dhg import HGDataset, data_to_hg
-from src.graphs.graph_build import create_graph
-
+from src.graphs.builder import return_graph_data
 
 # my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1 
 # for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --wavelets 0

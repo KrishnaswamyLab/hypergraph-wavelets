@@ -1,50 +1,60 @@
 name: hypergraph
 channels:
-  - defaults
+  - pytorch
+  - pyg
   - conda-forge
-  - https://repo.anaconda.com/pkgs/main
-  - https://repo.anaconda.com/pkgs/r
+  - defaults
+
 dependencies:
+  # Utilities
   - python=3.9
   - pip
   - numpy=1.26.4
   - scipy
   - pandas
   - matplotlib-base
-  - networkx
   - scikit-learn
-  - h5py
-  - pytorch
-  - torchvision
-  - torchaudio
-  - pytorch
-  - torchvision
-  - torchaudio
-  - pyg
   - ipykernel
   - jupyter
   - notebook
+  - h5py
+  - tqdm
+
+  # Deep Learning - PyTorch Ecosystem
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-scatter  # torch_scatter via conda-forge
+  - pyg
+
+  # Graph manipulation
+  - networkx
+
+ # Bioinformatics
   - anndata
   - scanpy
-  - tqdm
-  - pytorch-scatter
+
   - pip:
     - einops
+    - lightning
     - optuna
-    # - dhg
+
     - matplotlib==3.9.0
-    # - dhg==0.9.4
     - geovoronoi==0.4.0
     - graphtools==1.5.3
     - optuna==3.6.1
+
     - pandas==2.0.3
     - phate==1.0.11
-    - pygsp==0.5.1
-    - s-gd2==1.8.1
     - scprep==1.2.3
-    - shapely==2.0.4
-    - sqlalchemy==2.0.31
-    - tasklogger==1.2.0
-    - wrapt==1.16.0
-    - tqdm>=4.65.0
-    - lightning
+   # Utilities and infrastructure
+    # - s-gd2==1.8.1
+    # - sqlalchemy==2.0.31
+    # - tasklogger==1.2.0
+    # - wrapt==1.16.0
+    # - tqdm>=4.65.0
+
+    # - pygsp==0.5.1
+    # - s-gd2==1.8.1
+    # - shapely==2.0.4
+ 

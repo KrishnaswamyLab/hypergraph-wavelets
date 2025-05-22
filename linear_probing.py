@@ -44,7 +44,7 @@ if __name__ == '__main__':
         # load in the wavelet features
         hyperedge_feat = torch.load(os.path.join(FEATURE_DIR, dataset_name.split('.')[0] + save_end), weights_only=True)
 
-        print(f'num features: {hyperedge_feat.shape[1]}')
+        print(f'{dataset_name} -> Num features: {hyperedge_feat.shape[1]}')
 
         if hyperedge_feat.shape[1] != num_features:
             print('Number of features does not match')
@@ -84,7 +84,7 @@ if __name__ == '__main__':
         X_train, X_test = features[train_index], features[test_index]
         y_train, y_test = labels[train_index], labels[test_index]
         #clf = LogisticRegression(random_state=args.seed, max_iter=1000)
-        clf = LogisticRegression(random_state=args.seed, max_iter=1000, multi_class='multinomial')
+        clf = LogisticRegression(random_state=args.seed, max_iter=1000)
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
         accuracies.append(accuracy_score(y_test, y_pred))
