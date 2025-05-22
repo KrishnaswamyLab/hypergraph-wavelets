@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 from torch_geometric.data.hypergraph_data import HyperGraphData
 from src.models.cell_count_type_convs import CountCellTypesConv
-from src.models.hsn_pyg import HyperDiffusion
+from src.models.hyper_scattering_net import HyperDiffusion
 from src.utils.cell_categories import retrieve_all_cell_types_categories
 from tqdm import tqdm
 

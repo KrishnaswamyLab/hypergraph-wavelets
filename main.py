@@ -8,7 +8,7 @@ import torch
 
 
 from src.hypergraphs.featurizers import get_hyperedge_features
-from src.models.hsn_pyg import HSN
+from src.models.hyper_scattering_net import HSN
 from src.utils.hypergraph_utils import HGDataset, data_to_hg
 from src.graphs.builder import return_graph_data
 
@@ -57,7 +57,6 @@ if __name__ == '__main__':
 
         original_dataset = [data]
 
-        #to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, k_hop) # what should k be? 3?
         to_hg_func = lambda g: data_to_hg(g, add_k_hop=k_hop)
         dataset = HGDataset(original_dataset, data_to_hg)
         # honestly gpu speed up is incremental

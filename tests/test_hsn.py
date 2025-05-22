@@ -1,18 +1,20 @@
-#from hypg_scattering.models.hyper_scattering_net import HSN
 import sys
-# fix this later!
-# sys.path.insert(0, '/home/sumry2023_cqx3/hypergraph_scattering')
-sys.path.append('../../')
-from hypgs.models.hsn_pyg import HSN
-import torch
 import unittest
 from torch_geometric.datasets import TUDataset
-from dhg import Hypergraph
-from hypgs.utils.data import HGDataset
 from torch_geometric.loader import DataLoader
+import os
+
+# Add the src directory to sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+
+from models.hyper_scattering_net import HSN
+from utils.hypergraph_utils import HGDataset, data_to_hg
 
 original_dataset = TUDataset(root='../data/', name="MUTAG", use_node_attr=True)
-to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, 1)
+
+
+to_hg_func = lambda g: data_to_hg(g, add_k_hop=1)
+
 hgdataset = HGDataset(original_dataset, to_hg_func)
 dl = DataLoader(hgdataset, batch_size=32, shuffle=True)
 

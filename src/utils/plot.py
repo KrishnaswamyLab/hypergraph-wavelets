@@ -5,12 +5,11 @@ import pandas as pd
 import torch
 import scprep
 from torch_geometric.utils.convert import from_networkx
-from dhg import Hypergraph
 import sys
 
-sys.path.append('..')
-from .hypergraph_utils import HGDataset
-from src.models.hsn_pyg import HyperScatteringModule
+from src.models.hyper_scattering_net import HyperScatteringModule
+from src.utils.hypergraph_utils import HGDataset, data_to_hg
+
 
 def get_hyperedge_pos_df(hgdataset, coordinates):
     ei = hgdataset.edge_index
@@ -130,7 +129,9 @@ def get_wv_plots(G, X_data, coordinates, num_hops=1, graph_info='', device='cpu'
     data = from_networkx(G)
     data.x = torch.tensor(X_data)
     original_dataset = [data]
-    to_hg_func = lambda g: Hypergraph.from_graph_kHop(g, num_hops)
+
+    to_hg_func = lambda g: data_to_hg(g, add_k_hop=num_hops)
+
     dataset = HGDataset(original_dataset, to_hg_func)
     eidf = get_hyperedge_pos_df(dataset[0], coordinates)
     enlarged_hulls = compute_enlarged_hulls(eidf)

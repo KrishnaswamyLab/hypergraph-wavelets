@@ -1,4 +1,4 @@
-name: hypergraph
+name: hypergraph-wavelets
 channels:
   - pytorch
   - pyg
@@ -37,7 +37,7 @@ dependencies:
   - pip:
     - einops
     - lightning
-    - optuna
+    - pytest
 
     - matplotlib==3.9.0
     - geovoronoi==0.4.0
