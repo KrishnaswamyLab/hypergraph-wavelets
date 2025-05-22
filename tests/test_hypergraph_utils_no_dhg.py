@@ -1,7 +1,7 @@
 import pytest
 import torch
 from torch_geometric.data import Data
-from src.utils.hypergraph_utils import data_to_hg, get_hyperedge_index_from_edges  # Import the actual functions
+from src.hypergraphs.hypergraph_utils import data_to_hg, get_hyperedge_index_from_edges  # Import the actual functions
 
 import sys
 import os

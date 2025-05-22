@@ -4,11 +4,14 @@ import numpy as np
 import os
 import sys
 from tqdm import tqdm
-from model.hypergraph_scattering import HypergraphScatteringNet
 from torch_geometric.loader import DataLoader
 from sklearn.metrics import roc_auc_score, accuracy_score
 
-import_dir = '/'.join(os.path.realpath(__file__).split('/')[:-2])
+import_dir = '/'.join(os.path.realpath(__file__).split('/')[:-1])
+sys.path.insert(0, import_dir + '/src/models/')
+
+from hypergraph_scattering import HypergraphScatteringNet
+
 sys.path.insert(0, import_dir + '/src/utils/')
 from seed import seed_everything
 from log_utils import log
@@ -20,8 +23,7 @@ from placenta import PlacentaDatasetHypergraph
 from mibi import MIBIDataset, MIBISubsetHypergraph
 from extend import ExtendedDataset
 
-
-ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-2])
+ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 
 def prepare_dataloaders(args):
@@ -261,7 +263,8 @@ if __name__ == "__main__":
         model.train()
         model, train_loss, train_accuracy, train_auroc = train_epoch(model, train_loader, optimizer, loss_fn, device, args.max_training_iters, num_classes)
         scheduler.step()
-        log(f'Epoch {epoch_idx + 1}/{args.max_epochs}: (LR={optimizer.param_groups[0]['lr']}) Training Loss {train_loss:.3f}, ACC {train_accuracy:.3f}, macro AUROC {train_auroc:.3f}.',
+        log_lr = optimizer.param_groups[0]['lr']
+        log(f'Epoch {epoch_idx + 1}/{args.max_epochs}: (LR={log_lr}) Training Loss {train_loss:.3f}, ACC {train_accuracy:.3f}, macro AUROC {train_auroc:.3f}.',
             filepath=log_file)
 
         model.eval()
