@@ -14,6 +14,7 @@ from torch_geometric.data.hypergraph_data import HyperGraphData
 from sklearn.neighbors import kneighbors_graph
 from dhg import Graph, Hypergraph
 
+from src.hypergraphs.hypergraph_utils import data_to_hg
 logging.getLogger('pysmiles').setLevel(logging.CRITICAL)
 
 
@@ -114,7 +115,11 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
         num_vertices = graph_data.num_nodes
         node_features = graph_data.x
         labels = graph_data.y
-        graph = Graph(num_vertices, edge_list)
+        
+        # graph = Graph(num_vertices, edge_list)
+        print(graph_data)
+        hypergraph = data_to_hg(graph_data, add_k_hop=self.k_hop)
+        print(hypergraph)
         hypergraph = Hypergraph.from_graph_kHop(graph, k=self.k_hop)
 
         other_keys = [key for key in graph_data.keys() if key not in ['edge_index', 'num_nodes', 'x', 'y', 'edge_attr']]

@@ -1,4 +1,4 @@
-name: hypergraph-wavelets
+name: hypergraph-spatial
 channels:
   - pytorch
   - pyg

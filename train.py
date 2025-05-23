@@ -19,7 +19,7 @@ from data_utils import split_dataset, split_indices
 from scheduler import LinearWarmupCosineAnnealingLR
 
 sys.path.insert(0, import_dir + '/src/dataset/')
-from placenta import PlacentaDatasetHypergraph
+# from placenta import PlacentaDatasetHypergraph
 from mibi import MIBIDataset, MIBISubsetHypergraph
 from extend import ExtendedDataset
 
@@ -28,16 +28,17 @@ ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 def prepare_dataloaders(args):
     if args.dataset == 'placenta':
-        dataset = PlacentaDatasetHypergraph(data_folder=args.data_folder, k_hop=args.k_hop)
+        # dataset = PlacentaDatasetHypergraph(data_folder=args.data_folder, k_hop=args.k_hop)
 
-        # Train/val/test split
-        ratios = [float(c) for c in args.train_val_test_ratio.split(':')]
-        ratios = tuple([c / sum(ratios) for c in ratios])
+        # # Train/val/test split
+        # ratios = [float(c) for c in args.train_val_test_ratio.split(':')]
+        # ratios = tuple([c / sum(ratios) for c in ratios])
 
-        train_set, val_set, test_set = split_dataset(
-            dataset=dataset,
-            splits=ratios,
-            random_seed=0)  # Fix the dataset.
+        # train_set, val_set, test_set = split_dataset(
+        #     dataset=dataset,
+        #     splits=ratios,
+        #     random_seed=0)  # Fix the dataset.
+        return
 
     elif args.dataset == 'mibi':
         dataset = MIBIDataset(data_folder=args.data_folder, k_hop=args.k_hop)
@@ -69,6 +70,7 @@ def prepare_dataloaders(args):
             dataset=dataset,
             subset_indices=test_indices)
 
+        print(f'Train set: {len(train_set)}, Val set: {len(val_set)}, Test set: {len(test_set)}')
     min_batch_per_epoch = 5
     desired_len = args.batch_size * min_batch_per_epoch
     if len(train_set) < desired_len:
@@ -90,6 +92,7 @@ def train_epoch(model, train_loader, optimizer, loss_fn, device, max_iter, num_c
             break
 
         data_item = data_item.to(device)
+        print(data_item)
         y_true = torch.Tensor(data_item.y).long().to(device)
         y_pred = model(
             x=data_item.x,
@@ -137,7 +140,8 @@ def val_epoch(model, val_loader, loss_fn, device, max_iter, num_classes):
         y_pred = model(
             x=data_item.x,
             hyperedge_index=data_item.edge_index,
-            hyperedge_attr=data_item.edge_attr,
+            # hyperedge_attr = torch.zeros(data_item.num_e, node_features.shape[1]) # use all zero hyperedge attributes
+            hyperedge_attr=data_item.edge_attr, #TODO: better undestand how the hyperedge_attr is used.
             batch=data_item.batch)
         loss = loss_fn(y_pred, y_true)
 
@@ -203,8 +207,8 @@ if __name__ == "__main__":
     args.add_argument('--k-hop', default=1, type=int)
     args.add_argument('--num-workers', default=8, type=int)
     args.add_argument('--random-seed', default=1, type=int)
-    args.add_argument('--dataset', default='placenta', type=str)
-    args.add_argument('--data-folder', default='$ROOT/data/spatial_placenta_accreta/patchified_selected_genes', type=str)
+    args.add_argument('--dataset', default='mibi', type=str)
+    args.add_argument('--data-folder', default='$ROOT/data/MIBI/patchified_all_genes', type=str)
     args.add_argument('--num-features', default=212, type=int)  # number of genes or features
 
     args = args.parse_known_args()[0]
