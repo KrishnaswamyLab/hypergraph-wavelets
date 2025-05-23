@@ -14,7 +14,7 @@ from sklearn.metrics import f1_score
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--data_dir', type=str, default='data/interim/')
-    argparser.add_argument('--wavelet_feature_dir', type=str, default='data/processed/wavelet_features/1_hop/')
+    argparser.add_argument('--wavelet_feature_dir', type=str, default='data/processed/wavelet_features/3_hop/')
     argparser.add_argument('--lin_prob_target', type = str, default = 'response_binary')
     argparser.add_argument('--seed', type=int, default=0)
     argparser.add_argument('--wavelets', type=int, default=1)
