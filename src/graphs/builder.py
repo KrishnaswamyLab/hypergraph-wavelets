@@ -632,10 +632,8 @@ if __name__ == "__main__":
 
 def create_graph(adata,mode='voronoi'):
     if mode == 'voronoi':
-        print('Creating Voronoi Graph')
         return create_voronoi_graph(adata)
     else:
-        print('Creating knn Graph')
         return create_knn_graph(adata)
     
 def create_voronoi_graph(adata):

@@ -92,7 +92,6 @@ def train_epoch(model, train_loader, optimizer, loss_fn, device, max_iter, num_c
             break
 
         data_item = data_item.to(device)
-        print(data_item)
         y_true = torch.Tensor(data_item.y).long().to(device)
         y_pred = model(
             x=data_item.x,
@@ -209,7 +208,7 @@ if __name__ == "__main__":
     args.add_argument('--random-seed', default=1, type=int)
     args.add_argument('--dataset', default='mibi', type=str)
     args.add_argument('--data-folder', default='$ROOT/data/MIBI/patchified_all_genes', type=str)
-    args.add_argument('--num-features', default=212, type=int)  # number of genes or features
+    args.add_argument('--num-features', default=29, type=int)  # number of genes or features
 
     args = args.parse_known_args()[0]
     seed_everything(args.random_seed)
@@ -218,7 +217,7 @@ if __name__ == "__main__":
     args.data_folder = args.data_folder.replace('$ROOT', ROOT_DIR)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    print(device)
     # Load the data.
     train_loader, val_loader, test_loader, num_classes = prepare_dataloaders(args)
 

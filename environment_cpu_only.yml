@@ -1,13 +1,19 @@
-name: hypergraph-spatial
+name: hypergraph-spatial-cpu
 channels:
   - pytorch
   - pyg
   - conda-forge
-  - nvidia
   - defaults
 dependencies:
   - python=3.9
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cpuonly  # Remove this line if you want GPU support
   - pyg
+  - pytorch-sparse
+  - pytorch-scatter
+  - pytorch-cluster
   - einops
   - pytorch-lightning
   - numpy
@@ -23,11 +29,8 @@ dependencies:
   - networkx
   - anndata
   - scanpy
+  - pip
   - pip:
-    - torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-    - torch-scatter
-    - torch-sparse
-    - torch-cluster
     - torch-geometric
     - geovoronoi
     - graphtools==1.5.3

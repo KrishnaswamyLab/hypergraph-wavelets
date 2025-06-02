@@ -18,6 +18,7 @@ def data_to_hg(data, add_k_hop=1):
     edge_index_undirected = to_undirected(data.edge_index)
     hyperedges = [] 
     
+
     for node_idx in range(data.num_nodes):
         # first check if node_idx is in the graph. For some reason the mismatch appears to be very large!
         if node_idx not in edge_index_undirected[0]:
@@ -33,8 +34,10 @@ def data_to_hg(data, add_k_hop=1):
 
     #TODO: Understand Hyperedge node features 
     #Currently just setting as zero and using the num_features the same of nodes.
-    print(data.num_edges)
-    hyperedge_attr = torch.zeros(hyperedge_index.shape[1], data.x.shape[1]) # use all zero hyperedge attributes
+    num_hyperedges = len(hyperedges)
+
+    hyperedge_attr = torch.zeros(num_hyperedges, data.x.shape[1]) # use all zero hyperedge attributes
+    
     return HyperGraphData(x=data.x, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=data.y)
 
 def get_hyperedge_index_from_edges(hyperedges):
