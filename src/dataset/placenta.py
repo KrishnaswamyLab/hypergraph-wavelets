@@ -12,9 +12,13 @@ from torch_geometric.data import Data
 from torch_geometric.utils import from_networkx
 from torch_geometric.data.hypergraph_data import HyperGraphData
 from sklearn.neighbors import kneighbors_graph
-from dhg import Graph, Hypergraph
+# from dhg import Graph, Hypergraph
 
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.hypergraphs.hypergraph_utils import data_to_hg
+from src.graphs.builder import return_graph_data
+
 logging.getLogger('pysmiles').setLevel(logging.CRITICAL)
 
 
@@ -120,63 +124,65 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
         print(graph_data)
         hypergraph = data_to_hg(graph_data, add_k_hop=self.k_hop)
         print(hypergraph)
-        hypergraph = Hypergraph.from_graph_kHop(graph, k=self.k_hop)
 
-        other_keys = [key for key in graph_data.keys() if key not in ['edge_index', 'num_nodes', 'x', 'y', 'edge_attr']]
-        other_data = {key: graph_data[key] for key in other_keys}
+        return hypergraph
+        # hypergraph = Hypergraph.from_graph_kHop(graph, k=self.k_hop)
 
-        hyperedge_attr = torch.zeros(hypergraph.num_e, node_features.shape[1]) # use all zero hyperedge attributes
+        # other_keys = [key for key in graph_data.keys() if key not in ['edge_index', 'num_nodes', 'x', 'y', 'edge_attr']]
+        # other_data = {key: graph_data[key] for key in other_keys}
 
-        hyperedge_index = get_hyperedge_index(hypergraph)
-        # should be edge_attr = hyperedge_attr, but I'm setting it to none for now
-        hypergraph_data = HyperGraphData(x=node_features, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=labels)
-        if other_data is not None:
-            for key in other_data.keys():
-                hypergraph_data[key] = other_data[key]
-                if key == 'graph_y' and labels is None:
-                    hypergraph_data['y'] = other_data[key]
+        # hyperedge_attr = torch.zeros(hypergraph.num_e, node_features.shape[1]) # use all zero hyperedge attributes
 
-        return hypergraph_data
+        # hyperedge_index = get_hyperedge_index(hypergraph)
+        # # should be edge_attr = hyperedge_attr, but I'm setting it to none for now
+        # hypergraph_data = HyperGraphData(x=node_features, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=labels)
+        # if other_data is not None:
+        #     for key in other_data.keys():
+        #         hypergraph_data[key] = other_data[key]
+        #         if key == 'graph_y' and labels is None:
+        #             hypergraph_data['y'] = other_data[key]
+
+        # return hypergraph_data
 
 
-def get_hyperedge_index(hypergraph):
-    """
-    Get the hyperedge index from a hypergraph object. for the HyperGraphData class.
+# def get_hyperedge_index(hypergraph):
+#     """
+#     Get the hyperedge index from a hypergraph object. for the HyperGraphData class.
 
-    Args:
-        hypergraph: Hypergraph object
-    """
-    hyperedge_list = hypergraph.e[0]
-    # Flatten the list of tuples and also create a corresponding index list
-    flattened_list = []
-    index_list = []
-    for i, t in enumerate(hyperedge_list):
-        flattened_list.extend(t)
-        index_list.extend([i] * len(t))
+#     Args:
+#         hypergraph: Hypergraph object
+#     """
+#     hyperedge_list = hypergraph.e[0]
+#     # Flatten the list of tuples and also create a corresponding index list
+#     flattened_list = []
+#     index_list = []
+#     for i, t in enumerate(hyperedge_list):
+#         flattened_list.extend(t)
+#         index_list.extend([i] * len(t))
 
-    # Convert to 2D numpy array
-    hyperedge_index = torch.tensor([flattened_list, index_list])
+#     # Convert to 2D numpy array
+#     hyperedge_index = torch.tensor([flattened_list, index_list])
 
-    return hyperedge_index
+#     return hyperedge_index
 
-def return_graph_data(adata):
-    # Normalize the gene expression for each pixel.
-    sc.pp.normalize_total(adata, target_sum=1e6)
-    sc.pp.log1p(adata)
+# def return_graph_data(adata):
+#     # Normalize the gene expression for each pixel.
+#     sc.pp.normalize_total(adata, target_sum=1e6)
+#     sc.pp.log1p(adata)
 
-    # Create the graph.
-    G = create_knn_graph(adata)
+#     # Create the graph.
+#     G = create_knn_graph(adata)
 
-    # NetworkX to PyG.
-    data = from_networkx(G)
-    data.x = torch.tensor(adata.X.todense(), dtype=torch.float)
-    return data
+#     # NetworkX to PyG.
+#     data = from_networkx(G)
+#     data.x = torch.tensor(adata.X.todense(), dtype=torch.float)
+#     return data
 
-def create_knn_graph(adata, K: int = 10):
-    sparseA = kneighbors_graph(adata.obsm['spatial'], n_neighbors=K, mode='connectivity', include_self=False)
-    A = sparseA.todense()
-    G = nx.from_numpy_array(A)
-    return G
+# def create_knn_graph(adata, K: int = 10):
+#     sparseA = kneighbors_graph(adata.obsm['spatial'], n_neighbors=K, mode='connectivity', include_self=False)
+#     A = sparseA.todense()
+#     G = nx.from_numpy_array(A)
+#     return G
 
 
 if __name__ == '__main__':

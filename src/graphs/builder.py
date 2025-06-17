@@ -264,7 +264,8 @@ def read_raw_voronoi(voronoi_file):
     return voronoi_polygons
 
 
-def calcualte_voronoi_from_coords(x, y, xmax=None, ymax=None):
+
+def calculate_voronoi_from_coords(x, y, xmax=None, ymax=None):
     """Calculate voronoi polygons from a set of points
 
     Points are assumed to have coordinates in ([0, xmax], [0, ymax])
@@ -279,12 +280,14 @@ def calcualte_voronoi_from_coords(x, y, xmax=None, ymax=None):
         voronoi_polygons (list): list of voronoi polygons,
             represented by the coordinates of their exterior vertices
     """
-    xmax = 1.01 * max(x) if xmax is None else xmax
-    ymax = 1.01 * max(y) if ymax is None else ymax
+    xmax = 1.05 * max(x) if xmax is None else xmax
+    ymax = 1.05 * max(y) if ymax is None else ymax
     boundary = geometry.Polygon([[0, 0], [xmax, 0], [xmax, ymax], [0, ymax]])
     coords = np.stack([
         np.array(x).reshape((-1,)),
         np.array(y).reshape((-1,))], 1)
+    print(coords)
+    print(boundary)
     region_polys, _ = voronoi_regions_from_coords(coords, boundary)
     voronoi_polygons = [np.array(list(region_polys[k].exterior.coords)) for k in region_polys]
     return voronoi_polygons
@@ -539,7 +542,7 @@ def construct_graph_for_region(region_id,
 
     if voronoi_file is None:
         # Calculate voronoi polygons based on cell coordinates
-        voronoi_polygons = calcualte_voronoi_from_coords(cell_data['X'], cell_data['Y'])
+        voronoi_polygons = calculate_voronoi_from_coords(cell_data['X'], cell_data['Y'])
     else:
         # Load voronoi polygons from file
         voronoi_polygons = read_raw_voronoi(voronoi_file)
@@ -639,7 +642,7 @@ def create_graph(adata,mode='voronoi'):
 def create_voronoi_graph(adata):
     coordinates = adata.obsm['spatial']
     coordinates = coordinates - coordinates.min(axis=0)
-    voronoi_polygons = calcualte_voronoi_from_coords(coordinates[:, 0], coordinates[:, 1])
+    voronoi_polygons = calculate_voronoi_from_coords(coordinates[:, 0], coordinates[:, 1])
     cell_data = pd.DataFrame(np.c_[adata.obs.index, coordinates], columns=['CELL_ID', 'X', 'Y'])
     G, node_to_cell_mapping = build_graph_from_cell_coords(cell_data, voronoi_polygons)
     G = assign_attributes(G, cell_data, node_to_cell_mapping)

@@ -19,7 +19,7 @@ from data_utils import split_dataset, split_indices
 from scheduler import LinearWarmupCosineAnnealingLR
 
 sys.path.insert(0, import_dir + '/src/dataset/')
-# from placenta import PlacentaDatasetHypergraph
+from placenta import PlacentaDatasetHypergraph
 from mibi import MIBIDataset, MIBISubsetHypergraph
 from extend import ExtendedDataset
 
@@ -28,16 +28,16 @@ ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 def prepare_dataloaders(args):
     if args.dataset == 'placenta':
-        # dataset = PlacentaDatasetHypergraph(data_folder=args.data_folder, k_hop=args.k_hop)
+        dataset = PlacentaDatasetHypergraph(data_folder=args.data_folder, k_hop=args.k_hop)
 
-        # # Train/val/test split
-        # ratios = [float(c) for c in args.train_val_test_ratio.split(':')]
-        # ratios = tuple([c / sum(ratios) for c in ratios])
+        # Train/val/test split
+        ratios = [float(c) for c in args.train_val_test_ratio.split(':')]
+        ratios = tuple([c / sum(ratios) for c in ratios])
 
-        # train_set, val_set, test_set = split_dataset(
-        #     dataset=dataset,
-        #     splits=ratios,
-        #     random_seed=0)  # Fix the dataset.
+        train_set, val_set, test_set = split_dataset(
+            dataset=dataset,
+            splits=ratios,
+            random_seed=0)  # Fix the dataset.
         return
 
     elif args.dataset == 'mibi':
@@ -157,6 +157,12 @@ def val_epoch(model, val_loader, loss_fn, device, max_iter, num_classes):
 
     val_loss /= min(max_iter, len(val_loader))
     accuracy = accuracy_score(y_true_arr, np.argmax(y_pred_arr, axis=1))
+    # Check for invalid predictions
+    print(y_pred_arr)
+    print(np.arange(num_classes))
+    print(f"y_pred has NaN: {np.isnan(y_pred_arr).any()}")
+    print(f"y_pred has inf: {np.isinf(y_pred_arr).any()}")
+    print(f"y_pred range: [{y_pred_arr.min():.3f}, {y_pred_arr.max():.3f}]")
     auroc = roc_auc_score(y_true_arr, y_pred_arr, multi_class='ovo', average='macro', labels=np.arange(num_classes))
     return model, val_loss, accuracy, auroc
 
@@ -206,7 +212,7 @@ if __name__ == "__main__":
     args.add_argument('--k-hop', default=1, type=int)
     args.add_argument('--num-workers', default=8, type=int)
     args.add_argument('--random-seed', default=1, type=int)
-    args.add_argument('--dataset', default='mibi', type=str)
+    args.add_argument('--dataset', default='placenta', type=str)
     args.add_argument('--data-folder', default='$ROOT/data/MIBI/patchified_all_genes', type=str)
     args.add_argument('--num-features', default=29, type=int)  # number of genes or features
 
@@ -262,6 +268,7 @@ if __name__ == "__main__":
 
     log(f'[HypergraphScattering] Training begins.', filepath=log_file)
     best_val_auroc = 0
+    best_val_accuracy = 0
     for epoch_idx in tqdm(range(args.max_epochs)):
         model.train()
         model, train_loss, train_accuracy, train_auroc = train_epoch(model, train_loader, optimizer, loss_fn, device, args.max_training_iters, num_classes)
@@ -274,9 +281,11 @@ if __name__ == "__main__":
         model, val_loss, val_accuracy, val_auroc = val_epoch(model, val_loader, loss_fn, device, args.max_validation_iters, num_classes)
         log(f'Validation Loss {val_loss:.3f}, ACC {val_accuracy:.3f}, macro AUROC {val_auroc:.3f}.',
             filepath=log_file)
-
-        if val_auroc > best_val_auroc:
-            best_val_auroc = val_auroc
+        print(f'WTR::::{val_auroc}')
+        # if val_auroc > best_val_auroc:
+        if val_accuracy > best_val_accuracy:
+            print('WTR')
+            best_val_accuracy = val_accuracy
             torch.save(model.state_dict(), model_save_path)
             log('Model weights successfully saved.', filepath=log_file)
 
