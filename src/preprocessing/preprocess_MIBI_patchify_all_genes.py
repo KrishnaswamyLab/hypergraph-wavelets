@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import anndata as ad
 from tqdm import tqdm
+import scanpy as sc
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -46,6 +47,15 @@ if __name__ == '__main__':
         matrix = matrix.loc[matrix['id'] == patient_id]
         matrix = matrix.drop(['id', 'unique_id', 'label', 'area'], axis=1)
 
+        # Normalize the gene expression for each cell.
+        # Be careful not to normalize the coordinates!
+        cell_by_gene = matrix.drop(['x_centroid', 'y_centroid'], axis=1)
+        assert (cell_by_gene.keys() == features).all()
+        adata = ad.AnnData(X=cell_by_gene, var=pd.DataFrame(index=features))
+        sc.pp.normalize_total(adata, target_sum=1e6)
+        sc.pp.log1p(adata)
+        matrix.loc[:, features] = adata.X
+
         variable_df = pd.DataFrame({'Gene Expression': features})
         variable_df.index = features
 
@@ -80,7 +90,7 @@ if __name__ == '__main__':
 
                 sub_matrix = sub_matrix.drop(['x_centroid', 'y_centroid'], axis=1)
 
-                # NOTE: Filter underexpressed cells. Not filtering unexpressed genes because they may vary across subjects.
+                # NOTE: Filter unexpressed cells. Not filtering unexpressed genes because they may vary across subjects.
                 # Remove cells where zero gene is expressed.
                 barcode_position_valid = np.array(sub_matrix.sum(axis=1) > 0).reshape(-1)
                 sub_barcodes = sub_barcodes[barcode_position_valid]
@@ -103,6 +113,7 @@ if __name__ == '__main__':
 
                 # Increment rules.
                 y_start += step_size_y
+
             # Increment rules.
             y_start = y_min
             x_start += step_size_x

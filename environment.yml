@@ -1,4 +1,4 @@
-name: hypergraph-spatial
+name: hypergraph
 channels:
   - pytorch
   - pyg
@@ -24,7 +24,9 @@ dependencies:
   - anndata
   - scanpy
   - pip:
-    - torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    - torch
+    - torchvision
+    - torchaudio
     - torch-scatter
     - torch-sparse
     - torch-cluster

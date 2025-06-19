@@ -38,7 +38,6 @@ def prepare_dataloaders(args):
             dataset=dataset,
             splits=ratios,
             random_seed=0)  # Fix the dataset.
-        return
 
     elif args.dataset == 'mibi':
         dataset = MIBIDataset(data_folder=args.data_folder, k_hop=args.k_hop)
@@ -70,7 +69,8 @@ def prepare_dataloaders(args):
             dataset=dataset,
             subset_indices=test_indices)
 
-        print(f'Train set: {len(train_set)}, Val set: {len(val_set)}, Test set: {len(test_set)}')
+    print(f'Train set: {len(train_set)}, Val set: {len(val_set)}, Test set: {len(test_set)}')
+
     min_batch_per_epoch = 5
     desired_len = args.batch_size * min_batch_per_epoch
     if len(train_set) < desired_len:
@@ -79,6 +79,7 @@ def prepare_dataloaders(args):
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
+
     return train_loader, val_loader, test_loader, dataset.num_classes
 
 def train_epoch(model, train_loader, optimizer, loss_fn, device, max_iter, num_classes):
@@ -223,7 +224,7 @@ if __name__ == "__main__":
     args.data_folder = args.data_folder.replace('$ROOT', ROOT_DIR)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(device)
+
     # Load the data.
     train_loader, val_loader, test_loader, num_classes = prepare_dataloaders(args)
 
@@ -281,10 +282,8 @@ if __name__ == "__main__":
         model, val_loss, val_accuracy, val_auroc = val_epoch(model, val_loader, loss_fn, device, args.max_validation_iters, num_classes)
         log(f'Validation Loss {val_loss:.3f}, ACC {val_accuracy:.3f}, macro AUROC {val_auroc:.3f}.',
             filepath=log_file)
-        print(f'WTR::::{val_auroc}')
         # if val_auroc > best_val_auroc:
         if val_accuracy > best_val_accuracy:
-            print('WTR')
             best_val_accuracy = val_accuracy
             torch.save(model.state_dict(), model_save_path)
             log('Model weights successfully saved.', filepath=log_file)

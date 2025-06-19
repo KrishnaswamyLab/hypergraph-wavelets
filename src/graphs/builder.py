@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import warnings
 from scipy.spatial import Delaunay
-import scanpy as sc
+from scipy.sparse import issparse
 
 from geovoronoi import voronoi_regions_from_coords
 from shapely import geometry
@@ -286,8 +286,6 @@ def calculate_voronoi_from_coords(x, y, xmax=None, ymax=None):
     coords = np.stack([
         np.array(x).reshape((-1,)),
         np.array(y).reshape((-1,))], 1)
-    print(coords)
-    print(boundary)
     region_polys, _ = voronoi_regions_from_coords(coords, boundary)
     voronoi_polygons = [np.array(list(region_polys[k].exterior.coords)) for k in region_polys]
     return voronoi_polygons
@@ -323,7 +321,7 @@ def build_graph_from_cell_coords(cell_data, voronoi_polygons):
     for t in dln.simplices:
         for v in t:
             neighbors[v].update(t)
-    
+
     for i, ns in enumerate(neighbors):
         for n in ns:
             G.add_edge(int(i), int(n))
@@ -638,7 +636,7 @@ def create_graph(adata,mode='voronoi'):
         return create_voronoi_graph(adata)
     else:
         return create_knn_graph(adata)
-    
+
 def create_voronoi_graph(adata):
     coordinates = adata.obsm['spatial']
     coordinates = coordinates - coordinates.min(axis=0)
@@ -655,15 +653,20 @@ def create_knn_graph(adata,K=10):
     return G
 
 
-def return_graph_data(adata,norm_target_sum=1e4):
+def return_graph_data(adata):
+    '''
+    NOTE: We won't do normalization here!
+    Pleas do your normalization beforehand if needed.
+    '''
 
-    # do log normalization
-    sc.pp.normalize_total(adata, target_sum=norm_target_sum)
-    sc.pp.log1p(adata)
+    # create the graph. modes are voronoi or knn
+    G = create_graph(adata, mode='voronoi')
 
-    #create the graph. modes are voronoi or knn
-    G = create_graph(adata,mode='voronoi')
-    
     data = from_networkx(G)
-    data.x = torch.tensor(adata.X, dtype=torch.float)
+    if issparse(adata.X):
+        cell_by_gene = adata.X.todense()
+    else:
+        cell_by_gene = adata.X
+    data.x = torch.tensor(cell_by_gene, dtype=torch.float)
+
     return data

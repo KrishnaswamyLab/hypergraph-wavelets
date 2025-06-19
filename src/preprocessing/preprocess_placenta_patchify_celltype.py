@@ -1,3 +1,4 @@
+from typing import Dict, List, Tuple
 import cv2
 import os
 import json
@@ -6,13 +7,13 @@ import numpy as np
 import pandas as pd
 import anndata as ad
 from tqdm import tqdm
-import scanpy as sc
+from scipy import sparse
 
 import warnings
 warnings.filterwarnings("ignore")
 
 folder_in = '../../data/spatial_placenta_accreta/raw/'
-folder_out = '../../data/spatial_placenta_accreta/patchified_selected_genes/'
+folder_out = '../../data/spatial_placenta_accreta/patchified_celltype/'
 NUM_BINS = 100
 MIN_PIXEL_PER_GRAPH = 20
 
@@ -21,8 +22,8 @@ GENES_BY_CELL_TYPE = {
     'Syncytiotrophoblast': ['CSH2', 'INHA', 'HSD3B1', 'ESR1', 'PGR', 'CD274', 'PSG4', 'ERVFRD-1', 'LGALS16', 'GDF15',
                             'INSL4', 'CGA', 'CYP19A1', 'TFPI'],
     'EVT': ['KRT8', 'HSD3B1', 'CSH2', 'CCNE1', 'MCAM', 'MUC4', 'ASCL2', 'ITGA5', 'ITGB1', 'INHA', 'PAPPA2', 'CDH5'],
-    'smooth_muscle_Endothelial': ['PECAM1', 'CDH5', 'CD34', 'KDR', 'IFI27', 'VWF'],
-    'Lymphatic_Endothelial': ['TFF3'],
+    'smooth-muscle-Endothelial': ['PECAM1', 'CDH5', 'CD34', 'KDR', 'IFI27', 'VWF'],
+    'Lymphatic-Endothelial': ['TFF3'],
     'Hoffbauer': ['CD163', 'LYVE1', 'VSIG4', 'MRC1', 'HPGDS', 'CD14'],
     'Mesenchymal': ['COL1A1', 'TAGLN', 'LUM', 'APOD', 'DCN', 'ACTA2'],
     'Fibroblasts': ['COL1A1', 'TAGLN', 'LUM', 'DCN'],
@@ -35,31 +36,79 @@ GENES_BY_CELL_TYPE = {
     'Myometrial': ['ACTA2', 'CNN1', 'OXTR'],
 }
 
-GENES_BY_FUNCTION = {
-    'EMT_TGF': ['TGFB1', 'TGFB2', 'TGFB3', 'INHA', 'INHBA', 'INHHBB', 'INHBC', 'INHBE', 'NODAL', 'MSTN', 'BMP1',
-                'BMP2', 'BMP3', 'BMP4', 'BMP5', 'BMP6', 'BMP7', 'BMP8A', 'BMP8B', 'GDF2', 'BMP10', 'GDF3', 'GDF5',
-                'GDF6', 'GDF7', 'GDF9', 'BMP15', 'GDF10', 'GDF11', 'GDF15', 'AMH', 'LEFTY2', 'LEFTY1'],
-    'EMT_FGF': ['FGF1', 'FGF2', 'FGF3', 'FGF7', 'FGF10', 'FGF22', 'FGF22', 'FGF4', 'FGF5', 'FGF6', 'FGF8', 'FGF17',
-                'FGF18', 'FGF9', 'FGF16', 'FGF20', 'FGF19', 'FGF21', 'FGF23', 'FGFR1', 'FGFR2', 'FGFR3', 'FGFR4'],
-    'EMT_EGF': ['EGF', 'EGFR'],
-    'EMT_HIF': ['HIF1A', 'ARNT', 'EPAS1', 'ARNT2', 'HIF3A', 'ARNT3'],
-    'EMT_other': ['SNAI1', 'SNAI2', 'SNAI3', 'ZEB1', 'ZEB2', 'TWIST1', 'TWIST2', 'RREB1', 'SMAD', 'CDH1', 'VIM', 'FSP1',
-                  'STAT3', 'FOXC2', 'ITGA5', 'VCAN', 'COL3A1', 'COL5A1', 'MSN', 'FN1', 'WNT5B', 'JAG1', 'NOTCH1',
-                  'MCL1', 'CXCR4', 'CXCL12', 'ADAM19', 'ADAM12', 'CTNNB1', 'MSX2', 'SERPINF1', 'CSH1', 'HLA-G',
-                  'ERVFRD-1', 'SIGLEC6', 'CLDN1', 'ANK3', 'MARVELD3', 'OCLN', 'KRT19', 'ITGB4', 'ITGA5', 'ANK3'],
-    'EMT_MMP': ['MMP2', 'MMP9', 'MMP13', 'MMP14', 'MMP11', 'MMP21'],
-    'Hypoxia': ['DUSP1', 'NOX4', 'PLOD', 'BHLHE40', 'VCAM1', 'RND3', 'TXNIP', 'SLC21', 'SLC2A3', 'HK2', 'LDHA', 'LDHC',
-                'G6PD', 'TALDO1', 'GAPDH', 'ENO1', 'ENO2', 'HKDC1', 'PDK1', 'GPI', 'PGK1', 'PGM1', 'IDH3A', 'ALDOA',
-                'ALDOC', 'VASP', 'HSP90', 'VEGFR1', 'KITLG', 'TEK', 'BACE1', 'ANTXR2', 'BDNF', 'NFKBIA', 'MOV10L1',
-                'TP53', 'PCNA', 'CCRK', 'CCND1', 'E2F3', 'E2F6'],
-    'Oxidative_stress': ['EPHX1', 'SOD1', 'SOD2', 'SOD3', 'CYP1A1', 'NOS1', 'NOS2', 'NOS3', 'MAOB', 'PTGS2', 'CAT',
-                         'GPX', 'GST', 'TXN', 'HMOX1', 'NQO1', 'TXRD1', 'PRDX4', 'NEIL3'],
-}
+
+def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
+                    marker_gene_dict: Dict,
+                    gene_to_index: Dict,
+                    threshold: float = 0) -> Tuple[sparse._csr.csr_matrix, List[str]]:
+    '''
+    Infer the cell types for each cell from `gene_matrix`, a cell-by-gene matrix.
+    In this sub-cellular spatial-seq data, it's actually a pixel-by-gene matrix,
+    but the principle is the same.
+
+    `gene_matrix` does not need to be normalized if `threshold` is 0.
+
+    Parameters:
+    -----------
+    gene_matrix : sparse._csr.csr_matrix
+        Cell-by-gene expression matrix (n_cells x n_genes)
+    marker_gene_dict : Dict[str, List[str]]
+        Dictionary mapping cell type names to lists of marker gene names
+    gene_to_index : Dict[str, int]
+        Dictionary mapping gene names to the column indices in `gene_matrix`.
+    threshold : float, optional
+        Minimum score threshold for cell type assignment
+
+    Returns:
+    --------
+    cell_type_matrix : sparse._csr.csr_matrix
+        Binary matrix (n_cells x n_cell_types + 1) indicating cell type assignments.
+        Last column represents unassigned cells (zero expression or below threshold).
+    '''
+
+    # Get cell type names
+    cell_types = list(marker_gene_dict.keys())
+    n_cells = gene_matrix.shape[0]
+    n_cell_types = len(cell_types)
+
+    # Initialize score matrix (cells x cell_types)
+    scores = np.zeros((n_cells, n_cell_types))
+
+    # Calculate scores for each cell type
+    for cell_type_idx, cell_type in enumerate(cell_types):
+        marker_genes = marker_gene_dict[cell_type]
+
+        # Find indices of marker genes that exist in our data
+        marker_indices = [gene_to_index[gene] for gene in marker_genes if gene in gene_to_index]
+
+        # Extract expression of marker genes for all cells and sum
+        marker_expression = gene_matrix[:, marker_indices]
+        cell_type_scores = np.array(marker_expression.sum(axis=1)).flatten()
+        scores[:, cell_type_idx] = cell_type_scores
+
+    # Assign cell types based on highest scores
+    max_scores = np.max(scores, axis=1)
+    cell_type_assignments = np.argmax(scores, axis=1)
+
+    # Set to -1 (unassigned) if below or equal to threshold
+    cell_type_assignments[max_scores <= threshold] = -1
+
+    # Create binary assignment matrix (always n_cell_types + 1 columns)
+    cell_type_matrix = np.zeros((n_cells, n_cell_types + 1), dtype=np.uint8)
+    for i in range(n_cells):
+        if cell_type_assignments[i] >= 0:
+            cell_type_matrix[i, cell_type_assignments[i]] = 1
+        else:
+            cell_type_matrix[i, -1] = 1  # Unassigned category
+
+    cell_type_names = cell_types + ['Unassigned']
+    return sparse.csr_matrix(cell_type_matrix), cell_type_names
+
 
 
 if __name__ == '__main__':
     # Get all genes of interest.
-    selected_genes = np.unique(sum(GENES_BY_CELL_TYPE.values(), []) + sum(GENES_BY_FUNCTION.values(), []))
+    celltype_related_genes = np.unique(sum(GENES_BY_CELL_TYPE.values(), []))
 
     # Find the folders for pixel-by-gene matrices and the corresponding spatial images.
     all_folder_paths = sorted(glob(os.path.join(folder_in, '0*', 'filtered_feature_bc_matrix')))
@@ -86,9 +135,13 @@ if __name__ == '__main__':
         barcodes = pd.read_csv(os.path.join(source_mat_folder, 'barcodes.tsv'), header=None, sep="\t")
         features = pd.read_csv(os.path.join(source_mat_folder, 'features.tsv'), header=None, sep="\t")
         # Only take the selected genes.
-        selected_feature_indices = features[1].isin(selected_genes).to_numpy()
-        selected_features = features[selected_feature_indices]
-        joined_features = [f"{f0}_{f1}" for f0, f1 in zip(selected_features[0], selected_features[1])]
+        celltype_related_feature_indices = features[1].isin(celltype_related_genes).to_numpy()
+        celltype_related_features = features[celltype_related_feature_indices]
+        gene_to_index = {}
+        for idx, key in enumerate(celltype_related_features[1].keys()):
+            # Note that the indices need to be "restarted consecutively from 0",
+            # while the `keys` are w.r.t. the original numbering, hence the "enumerate".
+            gene_to_index[celltype_related_features[1][key]] = idx
 
         barcodes['barcode'] = barcodes[0]
         barcodes = barcodes.drop(0, axis=1)
@@ -122,23 +175,15 @@ if __name__ == '__main__':
         assert barcode_position.shape[0] == barcode_position_in_image.shape[0]
 
         # NOTE: Only keep selected genes of interest.
-        final_matrix = matrix.X.T
-        final_matrix = final_matrix[:, selected_feature_indices]
-        # NOTE: Filter underexpressed pixels. Remove pixels where zero gene is expressed.
-        barcode_position_expressed = np.array(final_matrix.sum(axis=1) > 0).reshape(-1)
+        celltype_related_matrix = matrix.X.T[:, celltype_related_feature_indices]
 
         # Apply filtering.
-        barcode_position_valid = np.logical_and(barcode_position_in_image, barcode_position_expressed)
-        barcode_position = barcode_position[barcode_position_valid]
+        barcode_position = barcode_position[barcode_position_in_image]
         barcode_position['pixel_row_in_highres'] = np.floor(barcode_position['pixel_row_in_highres']).astype(int)
         barcode_position['pixel_col_in_highres'] = np.floor(barcode_position['pixel_col_in_highres']).astype(int)
-        final_matrix = final_matrix[barcode_position_valid, :]
+        celltype_related_matrix = celltype_related_matrix[barcode_position_in_image, :]
 
-        # Normalize the gene expression for each cell.
-        adata = ad.AnnData(X=final_matrix, var=pd.DataFrame(index=selected_features))
-        sc.pp.normalize_total(adata, target_sum=1e6)
-        sc.pp.log1p(adata)
-        final_matrix = adata.X
+        celltype_label_matrix, cell_type_names = infer_cell_type(celltype_related_matrix, GENES_BY_CELL_TYPE, gene_to_index)
 
         # Subset the data by spatial location.
         cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
@@ -156,8 +201,8 @@ if __name__ == '__main__':
                 print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
                 continue
 
-            sub_matrix = final_matrix[indices, :]
-            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Gene Expression': joined_features}))
+            sub_matrix = celltype_label_matrix[indices, :]
+            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
             coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
             sub_adata.obsm['spatial'] = coords
 

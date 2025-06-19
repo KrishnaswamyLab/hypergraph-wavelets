@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import anndata as ad
 from tqdm import tqdm
+import scanpy as sc
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -43,6 +44,14 @@ if __name__ == '__main__':
         matrix = cell_by_protein.copy()
         matrix = matrix.loc[matrix['id'] == patient_id]
         matrix = matrix.drop(['id', 'unique_id', 'label', 'area', 'x_centroid', 'y_centroid'], axis=1)
+
+        # Normalize the gene expression for each cell.
+        cell_by_gene = matrix
+        assert (cell_by_gene.keys() == features).all()
+        adata = ad.AnnData(X=cell_by_gene, var=pd.DataFrame(index=features))
+        sc.pp.normalize_total(adata, target_sum=1e6)
+        sc.pp.log1p(adata)
+        matrix.loc[:, features] = adata.X
 
         barcodes = barcodes.reset_index(drop=True)
         matrix = matrix.reset_index(drop=True)
