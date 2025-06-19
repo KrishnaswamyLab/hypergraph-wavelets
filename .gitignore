@@ -159,11 +159,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-data/external/*
-data/interim/section_data/*
-data/processed/wavelet_features/*
-data/raw/*
-
 .DS_Store
 *.h5ad
 
@@ -173,3 +168,7 @@ data/raw/*
 *.out
 *.h5ad
 *.txt
+
+data/*
+reports/*
+!reports/.gitkeep

@@ -18,18 +18,27 @@ def data_to_hg(data, add_k_hop=1):
     edge_index_undirected = to_undirected(data.edge_index)
     hyperedges = [] 
     
+
     for node_idx in range(data.num_nodes):
         # first check if node_idx is in the graph. For some reason the mismatch appears to be very large!
         if node_idx not in edge_index_undirected[0]:
             print(f'Node {node_idx} not in graph, skipping.")')
             continue
-        subset, _, _, _ = k_hop_subgraph(
+
+        subset, edge_index, mapping, edge_mask = k_hop_subgraph(
             node_idx=node_idx, num_hops=add_k_hop, edge_index=edge_index_undirected, relabel_nodes=False
         )
         hyperedges.append(subset.tolist())
 
     hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
-    return HyperGraphData(x=data.x, edge_index=hyperedge_index, y=data.y)
+
+    #TODO: Understand Hyperedge node features 
+    #Currently just setting as zero and using the num_features the same of nodes.
+    num_hyperedges = len(hyperedges)
+
+    hyperedge_attr = torch.zeros(num_hyperedges, data.x.shape[1]) # use all zero hyperedge attributes
+    
+    return HyperGraphData(x=data.x, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=data.y)
 
 def get_hyperedge_index_from_edges(hyperedges):
     """
@@ -174,43 +183,6 @@ class CliqueHyperEdgeTransform(BaseTransform):
     
     def __repr__(self):
         return f"CliqueHyperEdgeTransform"
-
-# if __name__ == '__main__': 
-#     # visualize converting an ER graph into a hypergraph with the desired features
-
-#     # Create a random graph using NetworkX
-#     G = nx.fast_gnp_random_graph(10, 0.3)  # Generate a random graph with 10 nodes and edge probability 0.3
-
-#     # Visualize the generated graph (optional)
-#     nx.draw(G, with_labels=True)
-#     plt.show()
-
-#     # Convert NetworkX graph to PyTorch Geometric data object
-#     data = from_networkx(G)
-
-#     hg = data_to_hg(data, add_k_hop=1, min_k_hop_size = 3)
-#     hg.draw()
-
-
-def get_hyperedge_index(HG):
-    """
-    Get the hyperedge index from a hypergraph object. for the HyperGraphData class.
-    
-    Args:
-        HG: Hypergraph object
-    """
-    hyperedge_list = HG.e[0]
-    # Flatten the list of tuples and also create a corresponding index list
-    flattened_list = []
-    index_list = []
-    for i, t in enumerate(hyperedge_list):
-        flattened_list.extend(t)
-        index_list.extend([i] * len(t))
-
-    # Convert to 2D numpy array
-    hyperedge_index = torch.tensor([flattened_list, index_list])
-
-    return hyperedge_index
 
 # Remaining functions remain the same with minor modifications if necessary
 def get_HyperGraphData(HG, node_features, hyperedge_attr, labels, other_data=None):

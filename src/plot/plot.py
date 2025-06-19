@@ -7,8 +7,8 @@ import scprep
 from torch_geometric.utils.convert import from_networkx
 import sys
 
-from src.models.hyper_scattering_net import HyperScatteringModule
-from src.utils.hypergraph_utils import HGDataset, data_to_hg
+from src.models.hypergraph_scattering import HyperScatteringModule
+from src.hypergraphs.hypergraph_utils import HGDataset, data_to_hg
 
 
 def get_hyperedge_pos_df(hgdataset, coordinates):
