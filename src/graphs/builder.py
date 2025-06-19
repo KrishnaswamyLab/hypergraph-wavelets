@@ -452,7 +452,7 @@ def assign_attributes(G, cell_data, node_to_cell_mapping):
             continue
         node_index = cell_to_node_mapping[cell_id]
         p = {"cell_id": cell_id}
-        p["center_coord"] = (cell_row['X'], cell_row['Y'])
+        p["center_coord"] = np.array([cell_row['X'], cell_row['Y']])
         if "CELL_TYPE" in cell_row:
             p["cell_type"] = cell_row["CELL_TYPE"]
         else:

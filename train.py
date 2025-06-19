@@ -69,8 +69,6 @@ def prepare_dataloaders(args):
             dataset=dataset,
             subset_indices=test_indices)
 
-    print(f'Train set: {len(train_set)}, Val set: {len(val_set)}, Test set: {len(test_set)}')
-
     min_batch_per_epoch = 5
     desired_len = args.batch_size * min_batch_per_epoch
     if len(train_set) < desired_len:
@@ -223,10 +221,19 @@ if __name__ == "__main__":
     # Update paths with absolute path.
     args.data_folder = args.data_folder.replace('$ROOT', ROOT_DIR)
 
+    subset_name = os.path.basename(args.data_folder.rstrip('/'))
+    current_run_identifier = f'dataset-{args.dataset}-{subset_name}_kHop-{args.k_hop}_features-{args.num_features}_trainable_scales-{args.trainable_scales}_seed-{args.random_seed}'
+    log_file = os.path.join(ROOT_DIR, 'results', args.dataset, current_run_identifier, 'log.txt')
+    model_save_path = os.path.join(ROOT_DIR, 'results', args.dataset, current_run_identifier, 'model.pt')
+    os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    log(f'Using device: {device}', filepath=log_file, to_console=True)
 
     # Load the data.
     train_loader, val_loader, test_loader, num_classes = prepare_dataloaders(args)
+
+    log(f'Train set: {len(train_loader.dataset)}, Val set: {len(val_loader.dataset)}, Test set: {len(test_loader.dataset)}', filepath=log_file, to_console=True)
 
     model = HypergraphScatteringNet(
         in_channels=64,
@@ -253,12 +260,6 @@ if __name__ == "__main__":
         warmup_start_lr=args.learning_rate * 1e-2,
         max_epochs=args.max_epochs)
     loss_fn = torch.nn.CrossEntropyLoss()
-
-    subset_name = os.path.basename(args.data_folder.rstrip('/'))
-    current_run_identifier = f'dataset-{args.dataset}-{subset_name}_kHop-{args.k_hop}_features-{args.num_features}_trainable_scales-{args.trainable_scales}_seed-{args.random_seed}'
-    log_file = os.path.join(ROOT_DIR, 'results', args.dataset, current_run_identifier, 'log.txt')
-    model_save_path = os.path.join(ROOT_DIR, 'results', args.dataset, current_run_identifier, 'model.pt')
-    os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
 
     # Log the config.
     config_str = 'Config: \n'
