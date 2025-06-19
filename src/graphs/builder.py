@@ -452,7 +452,7 @@ def assign_attributes(G, cell_data, node_to_cell_mapping):
             continue
         node_index = cell_to_node_mapping[cell_id]
         p = {"cell_id": cell_id}
-        p["center_coord"] = np.array([cell_row['X'], cell_row['Y']])
+        p["center_coord"] = [cell_row['X'], cell_row['Y']]
         if "CELL_TYPE" in cell_row:
             p["cell_type"] = cell_row["CELL_TYPE"]
         else:
@@ -597,6 +597,56 @@ def construct_graph_for_region(region_id,
     return G
 
 
+def create_graph(adata, mode='voronoi'):
+    if mode == 'voronoi':
+        return create_voronoi_graph(adata)
+    else:
+        return create_knn_graph(adata)
+
+
+def create_voronoi_graph(adata):
+    coordinates = adata.obsm['spatial']
+    coordinates = coordinates - coordinates.min(axis=0)
+    voronoi_polygons = calculate_voronoi_from_coords(coordinates[:, 0], coordinates[:, 1])
+    cell_data = pd.DataFrame(np.c_[adata.obs.index, coordinates], columns=['CELL_ID', 'X', 'Y'])
+    G, node_to_cell_mapping = build_graph_from_cell_coords(cell_data, voronoi_polygons)
+    G = assign_attributes(G, cell_data, node_to_cell_mapping)
+    return G
+
+
+def create_knn_graph(adata,K=10):
+    sparseA = kneighbors_graph(adata.obsm['spatial'], K, mode='connectivity', include_self=False)
+    A = sparseA.todense()
+    G = nx.from_numpy_array(A)
+    return G
+
+
+def return_graph_data(adata):
+    '''
+    NOTE: We won't do normalization here!
+    Pleas do your normalization beforehand if needed.
+    '''
+    # create the graph. modes are voronoi or knn
+    G = create_graph(adata, mode='voronoi')
+
+    # NOTE: `voronoi_polygon` is stored as list of np.array,
+    # which makes the `from_networkx` convertion slow.
+    # I think `voronoi_polygon` is not used after this point.
+    for node in G.nodes():
+        if 'voronoi_polygon' in G.nodes[node]:
+            del G.nodes[node]['voronoi_polygon']
+
+    data = from_networkx(G)
+    if issparse(adata.X):
+        cell_by_gene = adata.X.todense()
+    else:
+        cell_by_gene = adata.X
+    cell_by_gene = np.array(cell_by_gene, dtype=np.float32)
+    data.x = torch.from_numpy(cell_by_gene)
+
+    return data
+
+
 if __name__ == "__main__":
     raw_data_root = "data/voronoi/"
     nx_graph_root = "data/example_dataset/graph"
@@ -631,42 +681,3 @@ if __name__ == "__main__":
                 graph_img_output=graph_img_output,
                 figsize=10)
 
-def create_graph(adata,mode='voronoi'):
-    if mode == 'voronoi':
-        return create_voronoi_graph(adata)
-    else:
-        return create_knn_graph(adata)
-
-def create_voronoi_graph(adata):
-    coordinates = adata.obsm['spatial']
-    coordinates = coordinates - coordinates.min(axis=0)
-    voronoi_polygons = calculate_voronoi_from_coords(coordinates[:, 0], coordinates[:, 1])
-    cell_data = pd.DataFrame(np.c_[adata.obs.index, coordinates], columns=['CELL_ID', 'X', 'Y'])
-    G, node_to_cell_mapping = build_graph_from_cell_coords(cell_data, voronoi_polygons)
-    G = assign_attributes(G, cell_data, node_to_cell_mapping)
-    return G
-
-def create_knn_graph(adata,K=10):
-    sparseA = kneighbors_graph(adata.obsm['spatial'], K, mode='connectivity', include_self=False)
-    A = sparseA.todense()
-    G = nx.from_numpy_array(A)
-    return G
-
-
-def return_graph_data(adata):
-    '''
-    NOTE: We won't do normalization here!
-    Pleas do your normalization beforehand if needed.
-    '''
-
-    # create the graph. modes are voronoi or knn
-    G = create_graph(adata, mode='voronoi')
-
-    data = from_networkx(G)
-    if issparse(adata.X):
-        cell_by_gene = adata.X.todense()
-    else:
-        cell_by_gene = adata.X
-    data.x = torch.tensor(cell_by_gene, dtype=torch.float)
-
-    return data
