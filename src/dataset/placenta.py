@@ -101,7 +101,7 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
 
     def __getitem__(self, idx: int) -> Data:
         adata = ad.read_h5ad(self.graph_path_arr[idx])
-        graph_data = return_graph_data(adata)
+        graph_data = return_graph_data(adata, mode='knn')
         y_true = self.class_arr[idx]
         graph_data.y = y_true
 
