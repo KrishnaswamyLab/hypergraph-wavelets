@@ -597,7 +597,7 @@ def construct_graph_for_region(region_id,
     return G
 
 
-def create_graph(adata, mode='voronoi'):
+def create_graph(adata, mode: str = 'voronoi'):
     if mode == 'voronoi':
         return create_voronoi_graph(adata)
     else:
@@ -614,36 +614,36 @@ def create_voronoi_graph(adata):
     return G
 
 
-def create_knn_graph(adata,K=10):
-    sparseA = kneighbors_graph(adata.obsm['spatial'], K, mode='connectivity', include_self=False)
+def create_knn_graph(adata, K: int = 10):
+    sparseA = kneighbors_graph(adata.obsm['spatial'], n_neighbors=K, mode='connectivity', include_self=False)
     A = sparseA.todense()
     G = nx.from_numpy_array(A)
     return G
 
 
-def return_graph_data(adata):
+def return_graph_data(adata, mode: str = 'voronoi'):
     '''
     NOTE: We won't do normalization here!
-    Pleas do your normalization beforehand if needed.
+    Please do your normalization beforehand if needed.
     '''
     # create the graph. modes are voronoi or knn
-    G = create_graph(adata, mode='voronoi')
+    G = create_graph(adata, mode=mode)
 
-    # NOTE: `voronoi_polygon` is stored as list of np.array,
-    # which makes the `from_networkx` convertion slow.
-    # I think `voronoi_polygon` is not used after this point.
-    for node in G.nodes():
-        if 'voronoi_polygon' in G.nodes[node]:
-            del G.nodes[node]['voronoi_polygon']
+    if mode == 'voronoi':
+        # NOTE: `voronoi_polygon` is stored as list of np.array,
+        # which makes the `from_networkx` convertion slow.
+        # I think `voronoi_polygon` is not used after this point.
+        for node in G.nodes():
+            if 'voronoi_polygon' in G.nodes[node]:
+                del G.nodes[node]['voronoi_polygon']
 
     data = from_networkx(G)
     if issparse(adata.X):
         cell_by_gene = adata.X.todense()
     else:
         cell_by_gene = adata.X
-    cell_by_gene = np.array(cell_by_gene, dtype=np.float32)
-    data.x = torch.from_numpy(cell_by_gene)
-
+    data.x = torch.from_numpy(np.array(cell_by_gene, dtype=np.float32))
+    data.coords = adata.obsm['spatial']
     return data
 
 

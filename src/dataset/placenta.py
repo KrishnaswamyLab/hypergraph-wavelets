@@ -76,7 +76,7 @@ class PlacentaDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Data:
         adata = ad.read_h5ad(self.graph_path_arr[idx])
-        graph_data = return_graph_data(adata)
+        graph_data = return_graph_data(adata, mode='knn')
         y_true = self.class_arr[idx]
         graph_data.y = y_true
 
@@ -105,13 +105,15 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
         y_true = self.class_arr[idx]
         graph_data.y = y_true
 
-        if self.transform:
-            graph_data = self.transform(graph_data)
-
+        '''
         edge_list = graph_data.edge_index.t() if 'edge_index' in graph_data.keys() else None
         num_vertices = graph_data.num_nodes
         node_features = graph_data.x
         labels = graph_data.y
+        '''
+
+        if self.transform:
+            graph_data = self.transform(graph_data)
 
         hypergraph = data_to_hg(graph_data, add_k_hop=self.k_hop)
 

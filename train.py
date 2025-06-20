@@ -91,7 +91,7 @@ def train_epoch(model, train_loader, optimizer, loss_fn, device, max_iter, num_c
             break
 
         data_item = data_item.to(device)
-        y_true = torch.Tensor(data_item.y).long().to(device)
+        y_true = data_item.y.long()
         y_pred = model(
             x=data_item.x,
             hyperedge_index=data_item.edge_index,
@@ -134,12 +134,11 @@ def val_epoch(model, val_loader, loss_fn, device, max_iter, num_classes):
             break
 
         data_item = data_item.to(device)
-        y_true = torch.Tensor(data_item.y).long().to(device)
+        y_true = data_item.y.long()
         y_pred = model(
             x=data_item.x,
             hyperedge_index=data_item.edge_index,
-            # hyperedge_attr = torch.zeros(data_item.num_e, node_features.shape[1]) # use all zero hyperedge attributes
-            hyperedge_attr=data_item.edge_attr, #TODO: better undestand how the hyperedge_attr is used.
+            hyperedge_attr=data_item.edge_attr,
             batch=data_item.batch)
         loss = loss_fn(y_pred, y_true)
 
@@ -171,8 +170,9 @@ def test_model(model, test_loader, loss_fn, device, num_classes):
     y_true_arr, y_pred_arr = None, None
 
     for data_item in test_loader:
+
         data_item = data_item.to(device)
-        y_true = torch.Tensor(data_item.y).long().to(device)
+        y_true = data_item.y.long()
         y_pred = model(
             x=data_item.x,
             hyperedge_index=data_item.edge_index,
@@ -181,7 +181,6 @@ def test_model(model, test_loader, loss_fn, device, num_classes):
         loss = loss_fn(y_pred, y_true)
 
         test_loss += loss.mean().item()
-
 
         y_true_np = y_true.detach().cpu().numpy()                        # shape: (batch size, 1)
         y_pred_np = torch.softmax(y_pred, dim=1).detach().cpu().numpy()  # shape: (batch size, num classes)
@@ -237,7 +236,7 @@ if __name__ == "__main__":
 
     model = HypergraphScatteringNet(
         in_channels=64,
-        hidden_channels=16,
+        hidden_channels=64,
         out_channels=num_classes,
         num_features=args.num_features,
         trainable_laziness=False,
@@ -249,8 +248,13 @@ if __name__ == "__main__":
         pooling='attention',
         scale_list=[0,1,2,4]
     )
-    model.eval()
     model.to(device)
+
+    # Check model parameters
+    total_params = 0
+    for param in model.parameters():
+        total_params += param.numel() * param.element_size()
+    log(f"Parameters: {total_params/1e3:.2f}KB", filepath=log_file)
 
     # Set up training tools.
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)

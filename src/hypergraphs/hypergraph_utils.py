@@ -2,6 +2,7 @@ from tqdm import tqdm
 from functools import partial
 from multiprocessing import Pool
 
+import numpy as np
 import torch
 import torch_geometric
 
@@ -11,13 +12,11 @@ from torch_geometric.data import Dataset
 
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_undirected
-from torch_geometric.utils import to_undirected, k_hop_subgraph
 
 
 def data_to_hg(data, add_k_hop=1):
     edge_index_undirected = to_undirected(data.edge_index)
-    hyperedges = [] 
-    
+    hyperedges = []
 
     for node_idx in range(data.num_nodes):
         # first check if node_idx is in the graph. For some reason the mismatch appears to be very large!
@@ -25,28 +24,27 @@ def data_to_hg(data, add_k_hop=1):
             print(f'Node {node_idx} not in graph, skipping.")')
             continue
 
-        subset, edge_index, mapping, edge_mask = k_hop_subgraph(
+        subset, edge_index, mapping, edge_mask = torch_geometric.utils.k_hop_subgraph(
             node_idx=node_idx, num_hops=add_k_hop, edge_index=edge_index_undirected, relabel_nodes=False
         )
         hyperedges.append(subset.tolist())
 
     hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
 
-    #TODO: Understand Hyperedge node features 
+    #TODO: Understand Hyperedge node features
     #Currently just setting as zero and using the num_features the same of nodes.
     num_hyperedges = len(hyperedges)
 
     hyperedge_attr = torch.zeros(num_hyperedges, data.x.shape[1]) # use all zero hyperedge attributes
-    
-    return HyperGraphData(x=data.x, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=data.y)
+    return HyperGraphData(x=data.x, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=torch.from_numpy(np.array(data.y)))
 
 def get_hyperedge_index_from_edges(hyperedges):
     """
     Convert a list of hyperedges to a hyperedge index tensor.
-    
+
     Args:
         hyperedges (list of list of int): List of hyperedges where each hyperedge is a list of node indices.
-    
+
     Returns:
         torch.Tensor: Hyperedge index tensor.
     """
@@ -55,7 +53,7 @@ def get_hyperedge_index_from_edges(hyperedges):
     for i, hyperedge in enumerate(hyperedges):
         flattened_list.extend(hyperedge)
         index_list.extend([i] * len(hyperedge))
-    
+
     return torch.tensor([flattened_list, index_list], dtype=torch.long)
 
 def get_clique_from_node( node_idx, graph ):
@@ -64,7 +62,7 @@ def get_clique_from_node( node_idx, graph ):
     periph_edge_index, _ = torch_geometric.utils.subgraph(periph_nodes, subgraph_edges)
     mask = periph_edge_index[0] < periph_edge_index[1]
     periph_edge_index = periph_edge_index[:, mask]
-    
+
     three_cliques = torch.cat([periph_edge_index, torch.ones((1,periph_edge_index.shape[1]), dtype = torch.long) * node_idx], dim = 0)
 
     four_cliques = []
@@ -75,21 +73,21 @@ def get_clique_from_node( node_idx, graph ):
                 if node in edge_:
                     continue # the node is already in the edge, not a triangle.
                 mask_1 = (periph_edge_index==node) + (periph_edge_index == edge_[0])
-                mask_2 = (periph_edge_index==node) + (periph_edge_index == edge_[1]) 
+                mask_2 = (periph_edge_index==node) + (periph_edge_index == edge_[1])
                 hyperedge_found = mask_1.all(0).any() * mask_2.all(0).any()
                 if hyperedge_found:
                     four_cliques.append(torch.cat([edge_, torch.tensor([node]), torch.tensor([node_idx])])[None,:])
-    
+
     if len(four_cliques)>0:
         four_cliques = torch.cat(four_cliques).T
-    
+
     return (three_cliques, four_cliques)
 
 def get_cliques_planar_(graph, njobs = 5):
     """
     Computes the 3 and 4-cliques from a torch geometric graph.
 
-    Input: 
+    Input:
         - torch geometric graph
     Output:
         Same object with attributes "three_cliques" and "four_cliques"
@@ -122,7 +120,7 @@ def get_cliques_planar(graph, njobs = 1):
     """
     Computes the 3 and 4-cliques from a torch geometric graph.
 
-    Input: 
+    Input:
         - torch geometric graph
     Output:
         Same object with attributes "three_cliques" and "four_cliques"
@@ -140,25 +138,25 @@ def get_cliques_planar(graph, njobs = 1):
         periph_edge_index, _ = torch_geometric.utils.subgraph(periph_nodes, subgraph_edges)
         mask = periph_edge_index[0] < periph_edge_index[1]
         periph_edge_index = periph_edge_index[:, mask]
-        
+
         three_cliques = torch.cat([periph_edge_index, torch.ones((1,periph_edge_index.shape[1]), dtype = torch.long) * node_idx], dim = 0)
         three_cliques_list.append(three_cliques)
 
         four_cliques = []
         #finding 4 cliques - just triangles in the peripherical nodes
-        
+
         if len(periph_nodes) >= 3:
             for edge_ in periph_edge_index.T:
                 for node in periph_nodes:
                     if node in edge_:
                         continue # the node is already in the edge, not a triangle.
                     mask_1 = (periph_edge_index==node) + (periph_edge_index == edge_[0])
-                    mask_2 = (periph_edge_index==node) + (periph_edge_index == edge_[1]) 
+                    mask_2 = (periph_edge_index==node) + (periph_edge_index == edge_[1])
                     hyperedge_found = mask_1.all(0).any() * mask_2.all(0).any()
                     if hyperedge_found:
                         #breakpoint()
                         four_cliques.append(torch.cat([edge_, torch.tensor([node]), torch.tensor([node_idx])])[None,:])
-        
+
         if len(four_cliques)>0:
             four_cliques = torch.cat(four_cliques).T
             four_cliques_list.append(four_cliques)
@@ -177,10 +175,10 @@ def get_cliques_planar(graph, njobs = 1):
 class CliqueHyperEdgeTransform(BaseTransform):
     def __init__(self):
         super().__init__()
-    
+
     def forward(self,data):
         return get_cliques_planar(data)
-    
+
     def __repr__(self):
         return f"CliqueHyperEdgeTransform"
 
@@ -284,4 +282,4 @@ if __name__ == "__main__":
 
     test_data_to_hg_with_k_hop(sample_data)
     test_create_HGDataset()
-    
+
