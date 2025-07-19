@@ -138,7 +138,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
     if fig_pc_save_path is not None:
         os.makedirs(os.path.dirname(fig_pc_save_path), exist_ok=True)
 
-        fig = plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(1, 1, 1)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -156,7 +156,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         ax.set_xlabel('PC1', fontsize=18)
         ax.set_ylabel('PC2', fontsize=18)
         ax.set_title('Cell Type Assignments', fontsize=24)
-        ax.legend(fontsize=12)
+        ax.legend(fontsize=12, bbox_to_anchor=(1.05, 1), loc='upper left')
         fig.tight_layout(pad=2)
         fig.savefig(fig_pc_save_path, dpi=300)
         plt.close()
@@ -164,7 +164,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
     if fig_spatial_save_path is not None:
         os.makedirs(os.path.dirname(fig_spatial_save_path), exist_ok=True)
 
-        fig = plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(1, 1, 1)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
