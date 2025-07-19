@@ -7,23 +7,16 @@ from tqdm import tqdm
 from torch_geometric.loader import DataLoader
 from sklearn.metrics import roc_auc_score, accuracy_score
 
-import_dir = '/'.join(os.path.realpath(__file__).split('/')[:-1])
-sys.path.insert(0, import_dir + '/src/models/')
-
-from hypergraph_scattering import HypergraphScatteringNet
-
-sys.path.insert(0, import_dir + '/src/utils/')
-from seed import seed_everything
-from log_utils import log
-from data_utils import split_dataset, split_indices
-from scheduler import LinearWarmupCosineAnnealingLR
-
-sys.path.insert(0, import_dir + '/src/dataset/')
-from placenta import PlacentaDatasetHypergraph
-from mibi import MIBIDataset, MIBISubsetHypergraph
-from extend import ExtendedDataset
-
-ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-1])
+ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-2])
+sys.path.insert(0, ROOT_DIR + '/src/')
+from models.hypergraph_scattering import HypergraphScatteringNet
+from utils.seed import seed_everything
+from utils.log_utils import log
+from utils.data_utils import split_dataset, split_indices
+from utils.scheduler import LinearWarmupCosineAnnealingLR
+from dataset.placenta import PlacentaDatasetHypergraph
+from dataset.mibi import MIBIDataset, MIBISubsetHypergraph
+from dataset.extend import ExtendedDataset
 
 
 def prepare_dataloaders(args):

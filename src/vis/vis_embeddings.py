@@ -11,15 +11,11 @@ import torch
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import normalize
 
-import_dir = '/'.join(os.path.realpath(__file__).split('/')[:-3])
-sys.path.insert(0, import_dir + '/src/utils/')
-from seed import seed_everything
-
-sys.path.insert(0, import_dir + '/src/')
-from model.hypergraph_scattering import HypergraphScatteringNet
-from train import prepare_dataloaders
-
 ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-3])
+sys.path.insert(0, ROOT_DIR + '/src/')
+from models.hypergraph_scattering import HypergraphScatteringNet
+from utils.seed import seed_everything
+from train import prepare_dataloaders
 
 
 @torch.no_grad()
@@ -87,7 +83,10 @@ def visualize_test_set_embeddings(embedding_save_path, class_map, gene_list, hyp
 
         if entity_name == 'hyperedge':
             if args.dataset == 'placenta':
-                gene_name_list = [item.split('_')[1] for item in gene_list]
+                if '_' in gene_list[0]:
+                    gene_name_list = [item.split('_')[1] for item in gene_list]
+                else:
+                    gene_name_list = gene_list
                 plot_histogram_for_genes(gene_name_list, gene_expression_arr, ['FGF2', 'FGFR1', 'FN1', 'KRT8'])
             else:
                 gene_name_list = gene_list
@@ -147,7 +146,10 @@ def visualize_test_set_embeddings(embedding_save_path, class_map, gene_list, hyp
         # Auto-determine layout (rows x cols) to be roughly square
         num_plots = len(gene_list)
         if args.dataset == 'placenta':
-            gene_name_list = [item.split('_')[1] for item in gene_list]
+            if '_' in gene_list[0]:
+                gene_name_list = [item.split('_')[1] for item in gene_list]
+            else:
+                gene_name_list = gene_list
         else:
             gene_name_list = gene_list
         idx_sorted = np.argsort(gene_name_list)
@@ -249,7 +251,7 @@ if __name__ == "__main__":
 
     model = HypergraphScatteringNet(
         in_channels=64,
-        hidden_channels=16,
+        hidden_channels=64,
         out_channels=num_classes,
         num_features=args.num_features,
         trainable_laziness=False,

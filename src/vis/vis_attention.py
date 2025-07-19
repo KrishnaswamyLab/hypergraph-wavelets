@@ -1,24 +1,16 @@
 import argparse
 import os
 import sys
-import meld
-import phate
-import scprep
 import numpy as np
 from tqdm import tqdm
 import torch
 from matplotlib import pyplot as plt
-from sklearn.preprocessing import normalize
-
-import_dir = '/'.join(os.path.realpath(__file__).split('/')[:-3])
-sys.path.insert(0, import_dir + '/src/utils/')
-from seed import seed_everything
-
-sys.path.insert(0, import_dir + '/src/')
-from model.hypergraph_scattering import HypergraphScatteringNet
-from train import prepare_dataloaders
 
 ROOT_DIR = '/'.join(os.path.realpath(__file__).split('/')[:-3])
+sys.path.insert(0, ROOT_DIR + '/src/')
+from utils.seed import seed_everything
+from models.hypergraph_scattering import HypergraphScatteringNet
+from train import prepare_dataloaders
 
 
 @torch.no_grad()
@@ -155,7 +147,10 @@ def visualize_test_set_attention(embedding_save_path, gene_list, class_map):
         ax.spines['right'].set_visible(False)
         ax.set_ylim([0, len(gene_names_sorted)])
         ax.set_yticks(range(len(gene_names_sorted)))
-        ax.set_yticklabels([item.split('_')[1] for item in gene_names_sorted])
+        if '_' in gene_names_sorted[0]:
+            ax.set_yticklabels([item.split('_')[1] for item in gene_names_sorted])
+        else:
+            ax.set_yticklabels(gene_names_sorted)
         ax.tick_params(axis='x', which='major', labelsize=18)
 
         if class_idx == 0:
@@ -186,7 +181,10 @@ def visualize_test_set_attention(embedding_save_path, gene_list, class_map):
         ax.spines['right'].set_visible(False)
         ax.set_ylim([0, len(gene_names_sorted)])
         ax.set_yticks(range(len(gene_names_sorted)))
-        ax.set_yticklabels([item.split('_')[1] for item in gene_names_sorted])
+        if '_' in gene_names_sorted[0]:
+            ax.set_yticklabels([item.split('_')[1] for item in gene_names_sorted])
+        else:
+            ax.set_yticklabels(gene_names_sorted)
         ax.tick_params(axis='x', which='major', labelsize=18)
 
         if class_idx == 0:
@@ -225,12 +223,12 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the data.
-    train_loader, val_loader, test_loader, dataset = prepare_dataloaders(args)
+    train_loader, val_loader, test_loader, num_classes = prepare_dataloaders(args)
 
     model = HypergraphScatteringNet(
         in_channels=64,
-        hidden_channels=16,
-        out_channels=dataset.num_classes,
+        hidden_channels=64,
+        out_channels=num_classes,
         num_features=args.num_features,
         trainable_laziness=False,
         trainable_scales=args.trainable_scales,
