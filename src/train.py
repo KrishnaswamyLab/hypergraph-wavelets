@@ -63,7 +63,7 @@ def prepare_dataloaders(args):
             subset_indices=test_indices)
 
     min_batch_per_epoch = 5
-    desired_len = args.batch_size * min_batch_per_epoch
+    desired_len = args.desired_batch_size * min_batch_per_epoch
     if len(train_set) < desired_len:
         train_set = ExtendedDataset(dataset=train_set, desired_len=desired_len)
 
