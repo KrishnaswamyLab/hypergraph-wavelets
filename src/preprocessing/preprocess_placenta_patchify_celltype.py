@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 
 folder_in = '../../data/spatial_placenta_accreta/raw/'
 folder_out = '../../data/spatial_placenta_accreta/patchified_celltype/'
-NUM_BINS = 10
+NUM_BINS = 20
 MIN_PIXEL_PER_GRAPH = 20
 
 GENES_BY_CELL_TYPE = {
