@@ -15,7 +15,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 folder_in = '../../data/spatial_placenta_accreta/raw/'
-folder_out = '../../data/spatial_placenta_accreta/patchified_celltype/'
+folder_out = '../../data/spatial_placenta_accreta/patchified_celltype_selected_genes/'
 NUM_BINS = 20
 MIN_PIXEL_PER_GRAPH = 20
 
@@ -269,10 +269,14 @@ if __name__ == '__main__':
         celltype_label_matrix, cell_type_names = infer_cell_type(
             celltype_related_matrix,
             GENES_BY_CELL_TYPE,
-            gene_to_index,
-            fig_pc_save_path=f'./vis_celltype/{target_folder}_pc.png',
-            fig_spatial_save_path=f'./vis_celltype/{target_folder}_spatial.png',
-            spatial_location=barcode_position[['X', 'Y']])
+            gene_to_index)
+
+        # Normalize the gene expression for each cell.
+        adata_genes = ad.AnnData(X=celltype_related_matrix, var=pd.DataFrame(index=celltype_related_features))
+        sc.pp.normalize_total(adata_genes, target_sum=1e6)
+        sc.pp.log1p(adata_genes)
+        joint_matrix = sparse.hstack((adata_genes.X, celltype_label_matrix))
+        joint_names = celltype_related_features[1].tolist() + cell_type_names
 
         # Subset the data by spatial location.
         cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
@@ -290,8 +294,8 @@ if __name__ == '__main__':
                 print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
                 continue
 
-            sub_matrix = celltype_label_matrix[indices, :]
-            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
+            sub_matrix = joint_matrix[indices, :]
+            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Expression': joint_names}))
             coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
             sub_adata.obsm['spatial'] = coords
 
