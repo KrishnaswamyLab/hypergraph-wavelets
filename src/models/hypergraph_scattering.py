@@ -352,8 +352,6 @@ class HypergraphScatteringNet(nn.Module):
         self.classifier = torch.nn.Sequential(
             torch.nn.Linear(self.num_features, self.num_features),
             torch.nn.GELU(),
-            torch.nn.Linear(self.num_features, self.num_features),
-            torch.nn.GELU(),
             torch.nn.Linear(self.num_features, self.out_channels),
         )
 
