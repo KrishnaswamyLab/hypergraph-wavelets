@@ -14,29 +14,26 @@ from matplotlib import pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
-dataset_name = 'spatial_placenta_accreta'
-folder_in = '../../data/spatial_placenta_accreta/raw/'
-folder_out = '../../data/spatial_placenta_accreta/patchified_celltype/'
-NUM_BINS = 20
-MIN_PIXEL_PER_GRAPH = 20
+folder_in = '../../data/spatial_placenta_accreta_16um/raw/'
+folder_out = '../../data/spatial_placenta_accreta_16um/patchified_celltype_selected_genes/'
+NUM_BINS = 10
+MIN_PIXEL_PER_GRAPH = 10
 
 GENES_BY_CELL_TYPE = {
-    'Cytotrophoblast': ['KRT7', 'STMN1', 'PARP1', 'PAGE4', 'GATA3', 'KRT8', 'SPINT1'],
-    'Syncytiotrophoblast': ['CSH2', 'INHA', 'HSD3B1', 'ESR1', 'PGR', 'CD274', 'PSG4', 'ERVFRD-1', 'LGALS16', 'GDF15',
-                            'INSL4', 'CGA', 'CYP19A1', 'TFPI'],
-    'EVT': ['KRT8', 'HSD3B1', 'CSH2', 'CCNE1', 'MCAM', 'MUC4', 'ASCL2', 'ITGA5', 'ITGB1', 'INHA', 'PAPPA2', 'CDH5'],
-    'smooth-muscle-Endothelial': ['PECAM1', 'CDH5', 'CD34', 'KDR', 'IFI27', 'VWF'],
-    'Lymphatic-Endothelial': ['TFF3'],
-    'Hoffbauer': ['CD163', 'LYVE1', 'VSIG4', 'MRC1', 'HPGDS', 'CD14'],
-    'Mesenchymal': ['COL1A1', 'TAGLN', 'LUM', 'APOD', 'DCN', 'ACTA2'],
-    'Fibroblasts': ['COL1A1', 'TAGLN', 'LUM', 'DCN'],
-    'B-cell': ['CD79A'],
-    'T-cell': ['CD3D'],
-    'NK': ['KLRB1'],
-    'Monocyte': ['CD14', 'FCGR3A'],
-    'Plasma': ['XBP1', 'IGHA1', 'IGHA2'],
-    'Decidua': ['PRL', 'FCGR3A', 'IGFBP1', 'ITGAX', 'CCNA1', 'RB1', 'CDK1', 'DKK1', 'WNT4'],
-    'Myometrial': ['ACTA2', 'CNN1', 'OXTR'],
+    'Syncytiotrophoblast': ['ACOXL', 'IGHA1', 'TCHH', 'GH2', 'TRIM40', 'CSH2', 'PSG7', 'PSG4', 'ALPP', 'CYP19A1',
+                            'LEP', 'PSG6', 'SDC1', 'MFSD2A'],
+    'Cytotrophoblasts': ['LARGE2', 'LGR5', 'LRP2', 'SLC22A11', 'SLC13A3', 'SLC16A12', 'PEG10', 'NFE2L3'],
+    'Extravillous_trohpoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
+    'Endothelial_cells_1': ['APLN', 'AREG', 'WNT3A', 'EGFL7', 'MMRN2', 'AGTR1', 'COX4I2', 'LRRC36'],
+    'Endothelial_cells_2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2',
+                            'PITX2'],
+    'Smooth_muscle_cells_1': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1',
+                              'ALDH1A2', 'NDP', 'CHI3L2'],
+    'Smooth_muscle_cells_2': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
+                              'HOXD9', 'THBS2', 'IGFBP7'],
+    'Mix_immune_cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
+    'Hofbauer_cells': ['RGS1', 'CTSW', 'DUSP2', 'CCL5', 'CD96', 'GBP5', 'CCL4', 'C1QC', 'FCGBP', 'SCN9A', 'FGL1',
+                       'CD28', 'GRIN2C', 'STAB1', 'LPAR5', 'C3AR1'],
 }
 
 
@@ -84,7 +81,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
     '''
 
     # Get cell type names
-    cell_types = list(marker_gene_dict.keys())
+    cell_types = sorted(list(marker_gene_dict.keys()))
     n_cells = gene_matrix.shape[0]
     n_cell_types = len(cell_types)
 
@@ -147,7 +144,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
 
         pca_coords = adata.obsm['X_pca'][:, :2]  # First 2 PCA components
         final_assignment_labels = [cell_type_names[i] if i >= 0 else 'Unassigned' for i in final_assignments]
-        unique_labels = list(set(final_assignment_labels))
+        unique_labels = sorted(list(set(final_assignment_labels)))
 
         colors = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
         for label, color in zip(unique_labels, colors):
@@ -175,11 +172,11 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         for label, color in zip(unique_labels, colors):
             mask = np.array(final_assignment_labels) == label
             ax.scatter(spatial_location['X'][mask], spatial_location['Y'][mask],
-                       c=[color], label=label, alpha=0.6, s=0.05)
+                       c=[color], label=label, alpha=0.6, s=0.1)
         ax.set_xlabel('Spatial X', fontsize=18)
         ax.set_ylabel('Spatial Y', fontsize=18)
         ax.set_title('Cell Type Assignments', fontsize=24)
-        ax.legend(fontsize=12, markerscale=12, bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.legend(fontsize=12, markerscale=30, bbox_to_anchor=(1.05, 1), loc='upper left')
         fig.tight_layout(pad=2)
         fig.savefig(fig_spatial_save_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -187,63 +184,23 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
     return sparse.csr_matrix(cell_type_matrix), cell_type_names
 
 
-def quantify_statistics(batch_index: str,
-                        disease_name: str,
-                        pixel_count: int,
-                        cell_type_counts: np.ndarray,
-                        cell_type_names: List[str],
-                        csv_path: str) -> None:
-    '''
-    Quantify the statistics and save in a csv file.
-    1. Number of cells with gene expression out of total, per sample.
-    2. Distribution of cell types per sample and per disease.
-    '''
-    # Total number of pixels with at least one cell type expressed
-    pixel_expressed_count = cell_type_counts.sum()
-
-    # Build the row dictionary
-    row_data = {
-        'batch_index' : batch_index,
-        'disease_name': disease_name,
-        'pixel_count': pixel_count,
-        'pixel_expressed_count': pixel_expressed_count
-    }
-
-    # Add cell type counts
-    for name, count in zip(cell_type_names, cell_type_counts):
-        row_data[f'count_{name}'] = count
-
-    # Convert to DataFrame with one row
-    df_new = pd.DataFrame([row_data])
-
-    # If file exists, append. Otherwise, create with header.
-    if os.path.exists(csv_path):
-        df_existing = pd.read_csv(csv_path)
-        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-    else:
-        df_combined = df_new
-
-    df_combined.to_csv(csv_path, index=False)
-
-    return
-
 
 if __name__ == '__main__':
     # Get all genes of interest.
     celltype_related_genes = np.unique(sum(GENES_BY_CELL_TYPE.values(), []))
 
     # Find the folders for pixel-by-gene matrices and the corresponding spatial images.
-    all_folder_paths = sorted(glob(os.path.join(folder_in, '0*', 'filtered_feature_bc_matrix')))
-    all_image_paths = sorted(glob(os.path.join(folder_in, '0*', 'spatial', 'tissue_hires_image.png')))
+    all_folder_paths = sorted(glob(os.path.join(folder_in, '*', 'filtered_feature_bc_matrix')))
+    all_image_paths = sorted(glob(os.path.join(folder_in, '*', 'spatial', 'tissue_hires_image.png')))
     assert len(all_folder_paths) == len(all_image_paths)
 
     filtered_folder_names, filtered_folders, filtered_image_paths = [], [], []
     for folder_path, image_path in zip(all_folder_paths, all_image_paths):
-        if 'normal_placenta' in folder_path or 'PAS' in folder_path or 'insufficient' in folder_path:
-            assert ('normal_placenta' in folder_path) + ('PAS' in folder_path) + ('insufficient' in folder_path) == 1
+        if 'normal' in folder_path or 'PAS' in folder_path or 'insufficient' in folder_path:
+            assert ('normal' in folder_path) + ('PAS' in folder_path) + ('insufficient' in folder_path) == 1
             filtered_folders.append(folder_path)
             filtered_image_paths.append(image_path)
-        if 'normal_placenta' in folder_path:
+        if 'normal' in folder_path:
             filtered_folder_names.append('batch_' + folder_path.split('/')[-2].split('_')[0] + '_normal_placenta')
         elif 'PAS' in folder_path:
             filtered_folder_names.append('batch_' + folder_path.split('/')[-2].split('_')[0] + '_PAS')
@@ -253,10 +210,14 @@ if __name__ == '__main__':
 
     for source_mat_folder, source_image_path, target_folder in tqdm(zip(filtered_folders, filtered_image_paths, filtered_folder_names),
                                                                     total=len(filtered_folders)):
-        batch_index = source_mat_folder.split('/')[-2].split('_')[0]
-        matrix = ad.io.read_mtx(os.path.join(source_mat_folder, 'matrix.mtx'))
-        barcodes = pd.read_csv(os.path.join(source_mat_folder, 'barcodes.tsv'), header=None, sep="\t")
-        features = pd.read_csv(os.path.join(source_mat_folder, 'features.tsv'), header=None, sep="\t")
+        matrix = ad.io.read_mtx(os.path.join(source_mat_folder, 'matrix.mtx.gz'))
+        barcodes = pd.read_csv(os.path.join(source_mat_folder, 'barcodes.tsv.gz'), header=None, sep="\t")
+        features = pd.read_csv(os.path.join(source_mat_folder, 'features.tsv.gz'), header=None, sep="\t")
+
+        # Assure the selected genes are all available.
+        for gene_name in celltype_related_genes:
+            assert gene_name in features[1].tolist()
+
         # Only take the selected genes.
         celltype_related_feature_indices = features[1].isin(celltype_related_genes).to_numpy()
         celltype_related_features = features[celltype_related_feature_indices]
@@ -302,7 +263,6 @@ if __name__ == '__main__':
         barcode_position['pixel_row_in_highres'] = np.floor(barcode_position['pixel_row_in_highres']).astype(int)
         barcode_position['pixel_col_in_highres'] = np.floor(barcode_position['pixel_col_in_highres']).astype(int)
         celltype_related_matrix = celltype_related_matrix[barcode_position_in_image, :]
-        pixel_count = barcode_position.shape[0]
 
         # NOTE: Remove pixels with 0 expression among the selected genes.
         expressed_cell_loc = celltype_related_matrix.toarray().sum(axis=1) > 0
@@ -312,45 +272,35 @@ if __name__ == '__main__':
         celltype_label_matrix, cell_type_names = infer_cell_type(
             celltype_related_matrix,
             GENES_BY_CELL_TYPE,
-            gene_to_index,
-            fig_pc_save_path=f'./{dataset_name}/vis_celltype/{target_folder}_pc.png',
-            fig_spatial_save_path=f'./{dataset_name}/vis_celltype/{target_folder}_spatial.png',
-            spatial_location=barcode_position[['X', 'Y']])
+            gene_to_index)
 
-        if 'normal_placenta' in source_mat_folder:
-            disease_name = 'normal'
-        elif 'PAS' in source_mat_folder:
-            disease_name = 'PAS'
-        elif 'insufficient' in source_mat_folder:
-            disease_name = 'insufficient'
+        # Normalize the gene expression for each cell.
+        adata_genes = ad.AnnData(X=celltype_related_matrix, var=pd.DataFrame(index=celltype_related_features))
+        sc.pp.normalize_total(adata_genes, target_sum=1e6)
+        sc.pp.log1p(adata_genes)
+        joint_matrix = sparse.hstack((adata_genes.X, celltype_label_matrix))
+        joint_names = celltype_related_features[1].tolist() + cell_type_names
 
-        quantify_statistics(batch_index=batch_index,
-                            disease_name=disease_name,
-                            pixel_count=pixel_count,
-                            cell_type_counts=celltype_label_matrix.toarray().sum(axis=0),
-                            cell_type_names=cell_type_names,
-                            csv_path=f'./{dataset_name}/dataset_statistics.csv')
+        # Subset the data by spatial location.
+        cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
+                                  'pixel_col_bin': pd.cut(barcode_position['pixel_col_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
+                                  'pixel_row_in_highres': barcode_position['pixel_row_in_highres'],
+                                  'pixel_col_in_highres': barcode_position['pixel_col_in_highres'],
+                                  'cell_index': np.arange(len(barcode_position))})
 
-        # # Subset the data by spatial location.
-        # cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
-        #                           'pixel_col_bin': pd.cut(barcode_position['pixel_col_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
-        #                           'pixel_row_in_highres': barcode_position['pixel_row_in_highres'],
-        #                           'pixel_col_in_highres': barcode_position['pixel_col_in_highres'],
-        #                           'cell_index': np.arange(len(barcode_position))})
+        # Iterate over groups and save them separately.
+        iterator_bins = cell_bins.groupby(['pixel_row_bin', 'pixel_col_bin'])
+        for (row_bin, col_bin), group in tqdm(sorted(iterator_bins), total=len(iterator_bins)):
+            # Extract pixels corresponding to this group.
+            indices = group['cell_index'].values
+            if len(indices) < MIN_PIXEL_PER_GRAPH:
+                print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
+                continue
 
-        # # Iterate over groups and save them separately.
-        # iterator_bins = cell_bins.groupby(['pixel_row_bin', 'pixel_col_bin'])
-        # for (row_bin, col_bin), group in tqdm(sorted(iterator_bins), total=len(iterator_bins)):
-        #     # Extract pixels corresponding to this group.
-        #     indices = group['cell_index'].values
-        #     if len(indices) < MIN_PIXEL_PER_GRAPH:
-        #         print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
-        #         continue
+            sub_matrix = joint_matrix[indices, :]
+            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Expression': joint_names}))
+            coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
+            sub_adata.obsm['spatial'] = coords
 
-        #     sub_matrix = celltype_label_matrix[indices, :]
-        #     sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
-        #     coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
-        #     sub_adata.obsm['spatial'] = coords
-
-        #     os.makedirs(folder_out, exist_ok=True)
-        #     sub_adata.write(os.path.join(folder_out, f'{target_folder}_Bin-{str(row_bin).zfill(2)}-{str(col_bin).zfill(2)}_spatial_matrix.h5ad'))
+            os.makedirs(folder_out, exist_ok=True)
+            sub_adata.write(os.path.join(folder_out, f'{target_folder}_Bin-{str(row_bin).zfill(2)}-{str(col_bin).zfill(2)}_spatial_matrix.h5ad'))

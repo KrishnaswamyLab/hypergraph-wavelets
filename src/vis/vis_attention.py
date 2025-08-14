@@ -215,6 +215,7 @@ if __name__ == "__main__":
 
     args = args.parse_known_args()[0]
     args.batch_size = 1
+    args.desired_batch_size = 1
     seed_everything(args.random_seed)
 
     # Update paths with absolute path.

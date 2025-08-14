@@ -87,7 +87,7 @@ def visualize_test_set_embeddings(embedding_save_path, class_map, gene_list, hyp
                     gene_name_list = [item.split('_')[1] for item in gene_list]
                 else:
                     gene_name_list = gene_list
-                plot_histogram_for_genes(gene_name_list, gene_expression_arr, ['FGF2', 'FGFR1', 'FN1', 'KRT8'])
+                # plot_histogram_for_genes(gene_name_list, gene_expression_arr, ['FGF2', 'FGFR1', 'FN1', 'KRT8'])
             else:
                 gene_name_list = gene_list
 
@@ -237,6 +237,7 @@ if __name__ == "__main__":
 
     args = args.parse_known_args()[0]
     args.batch_size = 1
+    args.desired_batch_size = 1
     seed_everything(args.random_seed)
 
     # Update paths with absolute path.
