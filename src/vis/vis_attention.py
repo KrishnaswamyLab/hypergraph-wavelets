@@ -126,8 +126,10 @@ def visualize_test_set_attention(embedding_save_path, gene_list, class_map):
     fig.savefig(os.path.join(os.path.dirname(embedding_save_path), 'feature_attentions.png'))
     plt.close(fig)
 
-    fig = plt.figure(figsize=(32, 32))
-    # import pdb; pdb.set_trace()
+    num_features = feature_attention_arr.shape[-1]
+    assert num_features == len(gene_list)
+    fig = plt.figure(figsize=(32, num_features//2))
+    colors = plt.cm.Blues(np.linspace(0.2, 0.8, num_features))
     for class_idx, class_name in class_map.items():
         subject_indices = (y_true_arr == class_idx).flatten()
 
@@ -142,11 +144,11 @@ def visualize_test_set_attention(embedding_save_path, gene_list, class_map):
         gene_names_sorted = np.array(gene_list)[sorted_idx]
 
         ax = fig.add_subplot(1, 2 * len(class_map.items()), class_idx + 1)
-        ax.barh(range(len(importance_sorted)), importance_sorted, color='firebrick', alpha=0.5)
+        ax.barh(range(len(importance_sorted)), importance_sorted, color=colors, alpha=1)
         ax.set_title(class_name, fontsize=24)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.set_ylim([0, len(gene_names_sorted)])
+        ax.set_ylim([-0.8, len(gene_names_sorted)])
         ax.set_yticks(range(len(gene_names_sorted)))
         if '_' in gene_names_sorted[0]:
             ax.set_yticklabels([item.split('_')[1] for item in gene_names_sorted])
@@ -176,11 +178,11 @@ def visualize_test_set_attention(embedding_save_path, gene_list, class_map):
         gene_names_sorted = np.array(gene_list)[sorted_idx]
 
         ax = fig.add_subplot(1, 2 * len(class_map.items()), len(class_map.items()) + class_idx + 1)
-        ax.barh(range(len(importance_sorted)), importance_sorted, color='firebrick', alpha=0.5)
+        ax.barh(range(len(importance_sorted)), importance_sorted, color=colors, alpha=1)
         ax.set_title(class_name, fontsize=24)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.set_ylim([0, len(gene_names_sorted)])
+        ax.set_ylim([-0.8, len(gene_names_sorted)])
         ax.set_yticks(range(len(gene_names_sorted)))
         if '_' in gene_names_sorted[0]:
             ax.set_yticklabels([item.split('_')[1] for item in gene_names_sorted])
@@ -251,7 +253,7 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(attention_save_path), exist_ok=True)
 
     model.eval()
-    model.load_state_dict(torch.load(model_save_path, map_location=device))
+    model.load_state_dict(torch.load(model_save_path, map_location=device, weights_only=True))
     if not os.path.isfile(attention_save_path):
         save_test_set_attentions(model, test_loader, device, attention_save_path)
 

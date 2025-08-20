@@ -25,15 +25,15 @@ GENES_BY_CELL_TYPE = {
                             'LEP', 'PSG6', 'SDC1', 'MFSD2A'],
     'Cytotrophoblasts': ['LARGE2', 'LGR5', 'LRP2', 'SLC22A11', 'SLC13A3', 'SLC16A12', 'PEG10', 'NFE2L3'],
     'Extravillous_trohpoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
-    'Endothelial_cells_1': ['APLN', 'AREG', 'WNT3A', 'EGFL7', 'MMRN2', 'AGTR1', 'COX4I2', 'LRRC36'],
-    'Endothelial_cells_2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2',
+    'Endothelial-cells-1': ['APLN', 'AREG', 'WNT3A', 'EGFL7', 'MMRN2', 'AGTR1', 'COX4I2', 'LRRC36'],
+    'Endothelial-cells-2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2',
                             'PITX2'],
-    'Smooth_muscle_cells_1': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1',
+    'Smooth-muscle-cells-1': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1',
                               'ALDH1A2', 'NDP', 'CHI3L2'],
-    'Smooth_muscle_cells_2': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
+    'Smooth-muscle-cells-2': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
                               'HOXD9', 'THBS2', 'IGFBP7'],
-    'Mix_immune_cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
-    'Hofbauer_cells': ['RGS1', 'CTSW', 'DUSP2', 'CCL5', 'CD96', 'GBP5', 'CCL4', 'C1QC', 'FCGBP', 'SCN9A', 'FGL1',
+    'Mix-immune-cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
+    'Hofbauer-cells': ['RGS1', 'CTSW', 'DUSP2', 'CCL5', 'CD96', 'GBP5', 'CCL4', 'C1QC', 'FCGBP', 'SCN9A', 'FGL1',
                        'CD28', 'GRIN2C', 'STAB1', 'LPAR5', 'C3AR1'],
 }
 
@@ -148,7 +148,8 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         final_assignment_labels = [cell_type_names[i] if i >= 0 else 'Unassigned' for i in final_assignments]
         unique_labels = sorted(list(set(final_assignment_labels)))
 
-        colors = plt.cm.Paired(np.linspace(0, 1, len(unique_labels)))
+        cmap = plt.get_cmap("Paired")
+        colors = [cmap(i % cmap.N) for i in range(len(unique_labels))]
         for label, color in zip(unique_labels, colors):
             mask = np.array(final_assignment_labels) == label
             ax.scatter(pca_coords[mask, 0], pca_coords[mask, 1],
@@ -170,7 +171,8 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         ax.spines['right'].set_visible(False)
         ax.tick_params(axis='both', which='major', labelsize=12)
 
-        colors = plt.cm.Paired(np.linspace(0, 1, len(unique_labels)))
+        cmap = plt.get_cmap("Paired")
+        colors = [cmap(i % cmap.N) for i in range(len(unique_labels))]
         for label, color in zip(unique_labels, colors):
             mask = np.array(final_assignment_labels) == label
             ax.scatter(spatial_location['X'][mask], spatial_location['Y'][mask],
