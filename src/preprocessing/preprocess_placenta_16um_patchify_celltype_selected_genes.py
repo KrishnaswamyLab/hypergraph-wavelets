@@ -1,4 +1,3 @@
-from typing import Dict, List, Tuple
 import cv2
 import os
 import json
@@ -9,180 +8,15 @@ import anndata as ad
 import scanpy as sc
 from tqdm import tqdm
 from scipy import sparse
-from matplotlib import pyplot as plt
+from preprocess_placenta_16um_patchify_celltype import GENES_BY_CELL_TYPE, infer_cell_type
 
 import warnings
 warnings.filterwarnings("ignore")
 
 folder_in = '../../data/spatial_placenta_accreta_16um/raw/'
 folder_out = '../../data/spatial_placenta_accreta_16um/patchified_celltype_selected_genes/'
-NUM_BINS = 10
-MIN_PIXEL_PER_GRAPH = 10
-
-GENES_BY_CELL_TYPE = {
-    'Syncytiotrophoblast': ['ACOXL', 'IGHA1', 'TCHH', 'GH2', 'TRIM40', 'CSH2', 'PSG7', 'PSG4', 'ALPP', 'CYP19A1',
-                            'LEP', 'PSG6', 'SDC1', 'MFSD2A'],
-    'Cytotrophoblasts': ['LARGE2', 'LGR5', 'LRP2', 'SLC22A11', 'SLC13A3', 'SLC16A12', 'PEG10', 'NFE2L3'],
-    'Extravillous_trohpoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
-    'Endothelial_cells_1': ['APLN', 'AREG', 'WNT3A', 'EGFL7', 'MMRN2', 'AGTR1', 'COX4I2', 'LRRC36'],
-    'Endothelial_cells_2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2',
-                            'PITX2'],
-    'Smooth_muscle_cells_1': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1',
-                              'ALDH1A2', 'NDP', 'CHI3L2'],
-    'Smooth_muscle_cells_2': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
-                              'HOXD9', 'THBS2', 'IGFBP7'],
-    'Mix_immune_cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
-    'Hofbauer_cells': ['RGS1', 'CTSW', 'DUSP2', 'CCL5', 'CD96', 'GBP5', 'CCL4', 'C1QC', 'FCGBP', 'SCN9A', 'FGL1',
-                       'CD28', 'GRIN2C', 'STAB1', 'LPAR5', 'C3AR1'],
-}
-
-
-def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
-                    marker_gene_dict: Dict,
-                    gene_to_index: Dict,
-                    threshold: float = 0,
-                    fig_pc_save_path: str = None,
-                    fig_spatial_save_path: str = None,
-                    spatial_location: pd.DataFrame = None) -> Tuple[sparse._csr.csr_matrix, List[str]]:
-    '''
-    Infer the cell types for each cell from `gene_matrix`, a cell-by-gene matrix.
-    In this sub-cellular spatial-seq data, it's actually a pixel-by-gene matrix,
-    but the principle is the same.
-
-    We will first perform Leiden clustering on the cells, and then infer
-    the cell type in each clustering using the marker genes.
-
-    `gene_matrix` does not need to be normalized if `threshold` is 0.
-
-    Parameters:
-    -----------
-    gene_matrix : sparse._csr.csr_matrix
-        Cell-by-gene expression matrix (n_cells x n_genes)
-    marker_gene_dict : Dict[str, List[str]]
-        Dictionary mapping cell type names to lists of marker gene names
-    gene_to_index : Dict[str, int]
-        Dictionary mapping gene names to the column indices in `gene_matrix`.
-    threshold : float, optional
-        Minimum score threshold for cell type assignment
-    fig_save_path : str, optional
-        If provided, will plot a visualization to this path.
-    fig_spatial_save_path : str, optional
-        If provided, will plot a visualization to this path.
-    spatial_location : pd.DataFrame, optional
-        DataFrame with fields 'X' and 'Y'. Required if fig_spatial_save_path is provided.
-
-    Returns:
-    --------
-    cell_type_matrix : sparse._csr.csr_matrix
-        Binary matrix (n_cells x n_cell_types + 1) indicating cell type assignments.
-        Last column represents unassigned cells (zero expression or below threshold).
-    cell_type_names : List[str]
-        Name of each cell type.
-    '''
-
-    # Get cell type names
-    cell_types = sorted(list(marker_gene_dict.keys()))
-    n_cells = gene_matrix.shape[0]
-    n_cell_types = len(cell_types)
-
-    # Construct a AnnData object, and normalize gene expressions.
-    adata = ad.AnnData(X=gene_matrix, obs=pd.DataFrame({'cell_id': np.arange(n_cells)}))
-    sc.pp.normalize_total(adata, target_sum=1e6)
-    sc.pp.log1p(adata)
-
-    # Run k-NN and Leiden clustering.
-    sc.pp.neighbors(adata, n_neighbors=15, n_pcs=10, method='umap')  # 'umap' here means UMap's fast k-NN algorithm.
-    sc.tl.leiden(adata, resolution=0.5)
-
-    # Calculate cluster-level marker scores.
-    cluster_labels = adata.obs['leiden'].astype(int)
-    unique_clusters = np.unique(cluster_labels)
-
-    cluster_cell_type_assignment = {}
-
-    for cluster_id in unique_clusters:
-        cluster_mask = (cluster_labels == cluster_id).values  # Convert to numpy array
-        cluster_scores = np.zeros(n_cell_types)
-
-        for cell_type_idx, cell_type in enumerate(cell_types):
-            marker_genes = marker_gene_dict[cell_type]
-            marker_indices = [gene_to_index[gene] for gene in marker_genes]
-
-            # Calculate mean expression of marker genes in this cluster.
-            cluster_expression = adata.X[cluster_mask][:, marker_indices]
-            mean_expression = np.mean(cluster_expression.sum(axis=1)) / len(marker_indices)
-            cluster_scores[cell_type_idx] = mean_expression
-
-        # Assign cluster to cell type with highest score, check threshold
-        max_score = np.max(cluster_scores)
-        if max_score > threshold:
-            cluster_cell_type_assignment[cluster_id] = np.argmax(cluster_scores)
-        else:
-            cluster_cell_type_assignment[cluster_id] = -1  # Unassigned
-
-    # Create final assignments.
-    final_assignments = np.array([cluster_cell_type_assignment[cluster_id] for cluster_id in cluster_labels])
-
-    # Create binary matrix.
-    cell_type_matrix = np.zeros((n_cells, n_cell_types + 1), dtype=np.uint8)
-    for i in range(n_cells):
-        if final_assignments[i] >= 0:
-            cell_type_matrix[i, final_assignments[i]] = 1
-        else:
-            cell_type_matrix[i, -1] = 1  # Unassigned category
-
-    cell_type_names = cell_types + ['Unassigned']
-
-    if fig_pc_save_path is not None:
-        os.makedirs(os.path.dirname(fig_pc_save_path), exist_ok=True)
-
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(1, 1, 1)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.tick_params(axis='both', which='major', labelsize=12)
-
-        pca_coords = adata.obsm['X_pca'][:, :2]  # First 2 PCA components
-        final_assignment_labels = [cell_type_names[i] if i >= 0 else 'Unassigned' for i in final_assignments]
-        unique_labels = sorted(list(set(final_assignment_labels)))
-
-        colors = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
-        for label, color in zip(unique_labels, colors):
-            mask = np.array(final_assignment_labels) == label
-            ax.scatter(pca_coords[mask, 0], pca_coords[mask, 1],
-                       c=[color], label=label, alpha=0.6, s=20)
-        ax.set_xlabel('PC1', fontsize=18)
-        ax.set_ylabel('PC2', fontsize=18)
-        ax.set_title('Cell Type Assignments', fontsize=24)
-        ax.legend(fontsize=12, bbox_to_anchor=(1.05, 1), loc='upper left')
-        fig.tight_layout(pad=2)
-        fig.savefig(fig_pc_save_path, dpi=300)
-        plt.close()
-
-    if fig_spatial_save_path is not None:
-        os.makedirs(os.path.dirname(fig_spatial_save_path), exist_ok=True)
-
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(1, 1, 1)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.tick_params(axis='both', which='major', labelsize=12)
-
-        colors = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
-        for label, color in zip(unique_labels, colors):
-            mask = np.array(final_assignment_labels) == label
-            ax.scatter(spatial_location['X'][mask], spatial_location['Y'][mask],
-                       c=[color], label=label, alpha=0.6, s=0.1)
-        ax.set_xlabel('Spatial X', fontsize=18)
-        ax.set_ylabel('Spatial Y', fontsize=18)
-        ax.set_title('Cell Type Assignments', fontsize=24)
-        ax.legend(fontsize=12, markerscale=30, bbox_to_anchor=(1.05, 1), loc='upper left')
-        fig.tight_layout(pad=2)
-        fig.savefig(fig_spatial_save_path, dpi=300, bbox_inches='tight')
-        plt.close()
-
-    return sparse.csr_matrix(cell_type_matrix), cell_type_names
-
+NUM_BINS = 30
+MIN_PIXEL_PER_GRAPH = 15
 
 
 if __name__ == '__main__':
@@ -263,11 +97,6 @@ if __name__ == '__main__':
         barcode_position['pixel_row_in_highres'] = np.floor(barcode_position['pixel_row_in_highres']).astype(int)
         barcode_position['pixel_col_in_highres'] = np.floor(barcode_position['pixel_col_in_highres']).astype(int)
         celltype_related_matrix = celltype_related_matrix[barcode_position_in_image, :]
-
-        # NOTE: Remove pixels with 0 expression among the selected genes.
-        expressed_cell_loc = celltype_related_matrix.toarray().sum(axis=1) > 0
-        celltype_related_matrix = celltype_related_matrix[expressed_cell_loc, :]
-        barcode_position = barcode_position[expressed_cell_loc]
 
         celltype_label_matrix, cell_type_names = infer_cell_type(
             celltype_related_matrix,

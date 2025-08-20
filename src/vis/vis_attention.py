@@ -127,6 +127,7 @@ def visualize_test_set_attention(embedding_save_path, gene_list, class_map):
     plt.close(fig)
 
     fig = plt.figure(figsize=(32, 32))
+    # import pdb; pdb.set_trace()
     for class_idx, class_name in class_map.items():
         subject_indices = (y_true_arr == class_idx).flatten()
 

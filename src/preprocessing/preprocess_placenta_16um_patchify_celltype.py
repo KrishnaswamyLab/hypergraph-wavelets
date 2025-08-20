@@ -17,8 +17,8 @@ warnings.filterwarnings("ignore")
 dataset_name = 'spatial_placenta_accreta_16um'
 folder_in = f'../../data/spatial_placenta_accreta_16um/raw/'
 folder_out = f'../../data/spatial_placenta_accreta_16um/patchified_celltype/'
-NUM_BINS = 10
-MIN_PIXEL_PER_GRAPH = 10
+NUM_BINS = 30
+MIN_PIXEL_PER_GRAPH = 15
 
 GENES_BY_CELL_TYPE = {
     'Syncytiotrophoblast': ['ACOXL', 'IGHA1', 'TCHH', 'GH2', 'TRIM40', 'CSH2', 'PSG7', 'PSG4', 'ALPP', 'CYP19A1',
@@ -41,7 +41,7 @@ GENES_BY_CELL_TYPE = {
 def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
                     marker_gene_dict: Dict,
                     gene_to_index: Dict,
-                    threshold: float = 0,
+                    threshold: float = 0.1,
                     fig_pc_save_path: str = None,
                     fig_spatial_save_path: str = None,
                     spatial_location: pd.DataFrame = None) -> Tuple[sparse._csr.csr_matrix, List[str]]:
@@ -92,8 +92,8 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
     sc.pp.log1p(adata)
 
     # Run k-NN and Leiden clustering.
-    sc.pp.neighbors(adata, n_neighbors=15, n_pcs=10, method='umap')  # 'umap' here means UMap's fast k-NN algorithm.
-    sc.tl.leiden(adata, resolution=0.5)
+    sc.pp.neighbors(adata, n_neighbors=10, n_pcs=10, method='umap')  # 'umap' here means UMap's fast k-NN algorithm.
+    sc.tl.leiden(adata, resolution=1.0)
 
     # Calculate cluster-level marker scores.
     cluster_labels = adata.obs['leiden'].astype(int)
@@ -108,11 +108,12 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         for cell_type_idx, cell_type in enumerate(cell_types):
             marker_genes = marker_gene_dict[cell_type]
             marker_indices = [gene_to_index[gene] for gene in marker_genes]
+            nonmarker_indices = list(set(np.arange(adata.X.shape[1])) - set(marker_indices))
 
             # Calculate mean expression of marker genes in this cluster.
-            cluster_expression = adata.X[cluster_mask][:, marker_indices]
-            mean_expression = np.mean(cluster_expression.sum(axis=1)) / len(marker_indices)
-            cluster_scores[cell_type_idx] = mean_expression
+            cluster_marker_expression = np.mean(adata.X[cluster_mask][:, marker_indices])
+            cluster_nonmarker_expression = np.mean(adata.X[cluster_mask][:, nonmarker_indices])
+            cluster_scores[cell_type_idx] = cluster_marker_expression - cluster_nonmarker_expression
 
         # Assign cluster to cell type with highest score, check threshold
         max_score = np.max(cluster_scores)
@@ -147,7 +148,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         final_assignment_labels = [cell_type_names[i] if i >= 0 else 'Unassigned' for i in final_assignments]
         unique_labels = sorted(list(set(final_assignment_labels)))
 
-        colors = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
+        colors = plt.cm.Paired(np.linspace(0, 1, len(unique_labels)))
         for label, color in zip(unique_labels, colors):
             mask = np.array(final_assignment_labels) == label
             ax.scatter(pca_coords[mask, 0], pca_coords[mask, 1],
@@ -155,7 +156,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         ax.set_xlabel('PC1', fontsize=18)
         ax.set_ylabel('PC2', fontsize=18)
         ax.set_title('Cell Type Assignments', fontsize=24)
-        ax.legend(fontsize=12, bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.legend(fontsize=12, markerscale=2, bbox_to_anchor=(1.05, 1), loc='upper left')
         fig.tight_layout(pad=2)
         fig.savefig(fig_pc_save_path, dpi=300)
         plt.close()
@@ -169,7 +170,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         ax.spines['right'].set_visible(False)
         ax.tick_params(axis='both', which='major', labelsize=12)
 
-        colors = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
+        colors = plt.cm.Paired(np.linspace(0, 1, len(unique_labels)))
         for label, color in zip(unique_labels, colors):
             mask = np.array(final_assignment_labels) == label
             ax.scatter(spatial_location['X'][mask], spatial_location['Y'][mask],
@@ -196,15 +197,15 @@ def quantify_statistics(batch_index: str,
     1. Number of cells with gene expression out of total, per sample.
     2. Distribution of cell types per sample and per disease.
     '''
-    # Total number of pixels with at least one cell type expressed
-    pixel_expressed_count = cell_type_counts.sum()
+    # Total number of pixels with cell type assigned
+    pixel_assigned_count = cell_type_counts[:-1].sum()
 
     # Build the row dictionary
     row_data = {
         'batch_index' : batch_index,
         'disease_name': disease_name,
         'pixel_count': pixel_count,
-        'pixel_expressed_count': pixel_expressed_count
+        'pixel_assigned_count': pixel_assigned_count
     }
 
     # Add cell type counts
@@ -306,11 +307,6 @@ if __name__ == '__main__':
         barcode_position['pixel_col_in_highres'] = np.floor(barcode_position['pixel_col_in_highres']).astype(int)
         celltype_related_matrix = celltype_related_matrix[barcode_position_in_image, :]
         pixel_count = barcode_position.shape[0]
-
-        # NOTE: Remove pixels with 0 expression among the selected genes.
-        expressed_cell_loc = celltype_related_matrix.toarray().sum(axis=1) > 0
-        celltype_related_matrix = celltype_related_matrix[expressed_cell_loc, :]
-        barcode_position = barcode_position[expressed_cell_loc]
 
         celltype_label_matrix, cell_type_names = infer_cell_type(
             celltype_related_matrix,
