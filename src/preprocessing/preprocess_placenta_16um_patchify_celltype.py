@@ -347,40 +347,40 @@ if __name__ == '__main__':
             spatial_location=barcode_position[['X', 'Y', 'pixel_row_in_highres', 'pixel_col_in_highres']],
             overlay_image=image)
 
-        # if 'normal' in source_mat_folder:
-        #     disease_name = 'normal'
-        # elif 'PAS' in source_mat_folder:
-        #     disease_name = 'PAS'
-        # elif 'insufficient' in source_mat_folder:
-        #     disease_name = 'insufficient'
+        if 'normal' in source_mat_folder:
+            disease_name = 'normal'
+        elif 'PAS' in source_mat_folder:
+            disease_name = 'PAS'
+        elif 'insufficient' in source_mat_folder:
+            disease_name = 'insufficient'
 
-        # quantify_statistics(batch_index=batch_index,
-        #                     disease_name=disease_name,
-        #                     pixel_count=pixel_count,
-        #                     cell_type_counts=celltype_label_matrix.toarray().sum(axis=0),
-        #                     cell_type_names=cell_type_names,
-        #                     csv_path=f'./{dataset_name}/dataset_statistics.csv')
+        quantify_statistics(batch_index=batch_index,
+                            disease_name=disease_name,
+                            pixel_count=pixel_count,
+                            cell_type_counts=celltype_label_matrix.toarray().sum(axis=0),
+                            cell_type_names=cell_type_names,
+                            csv_path=f'./{dataset_name}/dataset_statistics.csv')
 
-        # # Subset the data by spatial location.
-        # cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
-        #                           'pixel_col_bin': pd.cut(barcode_position['pixel_col_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
-        #                           'pixel_row_in_highres': barcode_position['pixel_row_in_highres'],
-        #                           'pixel_col_in_highres': barcode_position['pixel_col_in_highres'],
-        #                           'cell_index': np.arange(len(barcode_position))})
+        # Subset the data by spatial location.
+        cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
+                                  'pixel_col_bin': pd.cut(barcode_position['pixel_col_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
+                                  'pixel_row_in_highres': barcode_position['pixel_row_in_highres'],
+                                  'pixel_col_in_highres': barcode_position['pixel_col_in_highres'],
+                                  'cell_index': np.arange(len(barcode_position))})
 
-        # # Iterate over groups and save them separately.
-        # iterator_bins = cell_bins.groupby(['pixel_row_bin', 'pixel_col_bin'])
-        # for (row_bin, col_bin), group in tqdm(sorted(iterator_bins), total=len(iterator_bins)):
-        #     # Extract pixels corresponding to this group.
-        #     indices = group['cell_index'].values
-        #     if len(indices) < MIN_PIXEL_PER_GRAPH:
-        #         print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
-        #         continue
+        # Iterate over groups and save them separately.
+        iterator_bins = cell_bins.groupby(['pixel_row_bin', 'pixel_col_bin'])
+        for (row_bin, col_bin), group in tqdm(sorted(iterator_bins), total=len(iterator_bins)):
+            # Extract pixels corresponding to this group.
+            indices = group['cell_index'].values
+            if len(indices) < MIN_PIXEL_PER_GRAPH:
+                print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
+                continue
 
-        #     sub_matrix = celltype_label_matrix[indices, :]
-        #     sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
-        #     coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
-        #     sub_adata.obsm['spatial'] = coords
+            sub_matrix = celltype_label_matrix[indices, :]
+            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
+            coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
+            sub_adata.obsm['spatial'] = coords
 
-        #     os.makedirs(folder_out, exist_ok=True)
-        #     sub_adata.write(os.path.join(folder_out, f'{target_folder}_Bin-{str(row_bin).zfill(2)}-{str(col_bin).zfill(2)}_spatial_matrix.h5ad'))
+            os.makedirs(folder_out, exist_ok=True)
+            sub_adata.write(os.path.join(folder_out, f'{target_folder}_Bin-{str(row_bin).zfill(2)}-{str(col_bin).zfill(2)}_spatial_matrix.h5ad'))
