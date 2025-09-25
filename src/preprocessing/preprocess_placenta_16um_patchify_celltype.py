@@ -10,6 +10,7 @@ import scanpy as sc
 from tqdm import tqdm
 from scipy import sparse
 from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -21,27 +22,27 @@ NUM_BINS = 30
 MIN_PIXEL_PER_GRAPH = 15
 
 GENES_BY_CELL_TYPE = {
-    'Syncytiotrophoblast': ['ACOXL', 'IGHA1', 'TCHH', 'GH2', 'TRIM40', 'CSH2', 'PSG7', 'PSG4', 'ALPP', 'CYP19A1',
-                            'LEP', 'PSG6', 'SDC1', 'MFSD2A'],
     'Cytotrophoblasts': ['LARGE2', 'LGR5', 'LRP2', 'SLC22A11', 'SLC13A3', 'SLC16A12', 'PEG10', 'NFE2L3'],
-    'Extravillous_trohpoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
+    'Decidual-cells': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1', 'ALDH1A2', 'NDP', 'CHI3L2'],
+    'Extravillous-trohpoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
     'Endothelial-cells-1': ['APLN', 'AREG', 'WNT3A', 'EGFL7', 'MMRN2', 'AGTR1', 'COX4I2', 'LRRC36'],
     'Endothelial-cells-2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2',
                             'PITX2'],
-    'Smooth-muscle-cells-1': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1',
-                              'ALDH1A2', 'NDP', 'CHI3L2'],
-    'Smooth-muscle-cells-2': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
-                              'HOXD9', 'THBS2', 'IGFBP7'],
-    'Mix-immune-cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
     'Hofbauer-cells': ['RGS1', 'CTSW', 'DUSP2', 'CCL5', 'CD96', 'GBP5', 'CCL4', 'C1QC', 'FCGBP', 'SCN9A', 'FGL1',
                        'CD28', 'GRIN2C', 'STAB1', 'LPAR5', 'C3AR1'],
+    'Mixed-immune-cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
+    'Smooth-muscle-cells': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
+                            'HOXD9', 'THBS2', 'IGFBP7'],
+    'Syncytiotrophoblast': ['ACOXL', 'IGHA1', 'TCHH', 'GH2', 'TRIM40', 'CSH2', 'PSG7', 'PSG4', 'ALPP', 'CYP19A1',
+                            'LEP', 'PSG6', 'SDC1', 'MFSD2A'],
 }
 
 
 def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
                     marker_gene_dict: Dict,
                     gene_to_index: Dict,
-                    threshold: float = 0.1,
+                    threshold: float = 0.0,
+                    batch_name: str = '',
                     fig_pc_save_path: str = None,
                     fig_spatial_save_path: str = None,
                     spatial_location: pd.DataFrame = None,
@@ -96,7 +97,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
 
     # Run k-NN and Leiden clustering.
     sc.pp.neighbors(adata, n_neighbors=10, n_pcs=10, method='umap')  # 'umap' here means UMap's fast k-NN algorithm.
-    sc.tl.leiden(adata, resolution=1.0)
+    sc.tl.leiden(adata, resolution=0.1)
 
     # Calculate cluster-level marker scores.
     cluster_labels = adata.obs['leiden'].astype(int)
@@ -156,10 +157,10 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         for label, color in zip(unique_labels, colors):
             mask = np.array(final_assignment_labels) == label
             ax.scatter(pca_coords[mask, 0], pca_coords[mask, 1],
-                       c=[color], label=label, alpha=0.6, s=20)
+                       c=[color], label=label, alpha=0.5, s=20)
         ax.set_xlabel('PC1', fontsize=18)
         ax.set_ylabel('PC2', fontsize=18)
-        ax.set_title('Cell Type Assignments', fontsize=24)
+        ax.set_title(batch_name, fontsize=20)
         ax.legend(fontsize=12, markerscale=2, bbox_to_anchor=(1.05, 1), loc='upper left')
         fig.tight_layout(pad=2)
         fig.savefig(fig_pc_save_path, dpi=300)
@@ -167,6 +168,7 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
 
     if fig_spatial_save_path is not None:
         os.makedirs(os.path.dirname(fig_spatial_save_path), exist_ok=True)
+
         fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(1, 1, 1)
         ax.spines['top'].set_visible(False)
@@ -179,16 +181,17 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
             mask = np.array(final_assignment_labels) == label
             ax.scatter(spatial_location['Y'][mask],
                        spatial_location['X'][mask],
-                       c=[color], label=label, alpha=0.6, s=0.1)
-        ax.set_xlabel('Spatial X', fontsize=18)
-        ax.set_ylabel('Spatial Y', fontsize=18)
-        ax.set_title('Cell Type Assignments', fontsize=24)
+                       c=[color], label=label, alpha=0.5, s=0.1)
+        ax.set_xlabel('Spatial Y', fontsize=18)
+        ax.set_ylabel('Spatial X', fontsize=18)
+        ax.set_ylim(spatial_location['Y'].max(), 0)
+        ax.set_title(batch_name, fontsize=20)
         ax.legend(fontsize=12, markerscale=30, bbox_to_anchor=(1.05, 1), loc='upper left')
         fig.tight_layout(pad=2)
         fig.savefig(fig_spatial_save_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        for opacity in [0.4, 0.6, 0.8]:
+        for opacity in [0.2, 0.5, 0.8]:
 
             fig = plt.figure(figsize=(12, 8))
             ax = fig.add_subplot(1, 1, 1)
@@ -202,18 +205,168 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
             colors = [cmap(i % cmap.N) for i in range(len(unique_labels))]
             for label, color in zip(unique_labels, colors):
                 mask = np.array(final_assignment_labels) == label
-                ax.scatter(spatial_location['pixel_row_in_highres'][mask],
-                           spatial_location['pixel_col_in_highres'][mask],
+                ax.scatter(spatial_location['pixel_col_in_highres'][mask],
+                           spatial_location['pixel_row_in_highres'][mask],
                            c=[color], label=label, alpha=opacity, s=0.1)
-            ax.set_xlabel('Spatial X', fontsize=18)
-            ax.set_ylabel('Spatial Y', fontsize=18)
-            ax.set_title('Cell Type Assignments', fontsize=24)
+            ax.set_xlabel('Spatial Y', fontsize=18)
+            ax.set_ylabel('Spatial X', fontsize=18)
+            ax.set_ylim(spatial_location['pixel_row_in_highres'].max(), 0)
+            ax.set_title(batch_name, fontsize=20)
             ax.legend(fontsize=12, markerscale=30, bbox_to_anchor=(1.05, 1), loc='upper left')
             fig.tight_layout(pad=2)
             fig.savefig(fig_spatial_save_path.replace('.png', f'_opacity-{opacity}.png'), dpi=300, bbox_inches='tight')
             plt.close()
 
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(1, 1, 1)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.tick_params(axis='both', which='major', labelsize=12)
+        if overlay_image is not None:
+            ax.imshow(overlay_image)
+
+        cmap = plt.get_cmap("Paired")
+        colors = [cmap(i % cmap.N) for i in range(len(unique_labels))]
+        for label, color in zip(unique_labels, colors):
+            if label != "Unassigned":
+                continue
+            mask = np.array(final_assignment_labels) == label
+            ax.scatter(spatial_location['pixel_col_in_highres'][mask],
+                       spatial_location['pixel_row_in_highres'][mask],
+                       c=[color], label=label, alpha=0.8, s=0.1)
+        ax.set_xlabel('Spatial Y', fontsize=18)
+        ax.set_ylabel('Spatial X', fontsize=18)
+        ax.set_ylim(spatial_location['pixel_row_in_highres'].max(), 0)
+        ax.set_title(batch_name, fontsize=20)
+        ax.legend(fontsize=12, markerscale=30, bbox_to_anchor=(1.05, 1), loc='upper left')
+        fig.tight_layout(pad=2)
+        fig.savefig(fig_spatial_save_path.replace('.png', f'_unassigned.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
     return sparse.csr_matrix(cell_type_matrix), cell_type_names
+
+
+def visualize_gene_expression_profiles(gene_matrix: sparse._csr.csr_matrix,
+                                       cell_type_matrix: sparse._csr.csr_matrix,
+                                       cell_type_names: List[str],
+                                       marker_gene_dict: Dict,
+                                       gene_to_index: Dict,
+                                       batch_name: str = '',
+                                       save_path: str = None,
+                                       figsize: Tuple[int, int] = (16, 16)) -> None:
+    """
+    Visualize gene expression profiles across different cell types using a heatmap.
+
+    Parameters:
+    -----------
+    gene_matrix : sparse._csr.csr_matrix
+        Normalized gene expression matrix (n_cells x n_genes)
+    cell_type_matrix : sparse._csr.csr_matrix
+        Binary cell type assignment matrix (n_cells x n_cell_types)
+    cell_type_names : List[str]
+        Names of cell types (including 'Unassigned')
+    marker_gene_dict : Dict[str, List[str]]
+        Dictionary mapping cell type names to marker genes
+    gene_to_index : Dict[str, int]
+        Mapping from gene names to column indices
+    save_path : str, optional
+        Path to save the figure
+    figsize : Tuple[int, int]
+        Figure size for the heatmap
+    """
+    # Create block-diagonal gene ordering (marker genes grouped by cell type)
+    ordered_genes = []
+    gene_block_boundaries = []  # Track where each cell type's block starts/ends
+
+    # Add marker genes for each cell type in order
+    for cell_type in cell_type_names:
+        if cell_type == 'Unassigned' or cell_type not in marker_gene_dict:
+            continue
+
+        block_start = len(ordered_genes)
+        marker_genes = marker_gene_dict[cell_type]
+        for gene in marker_genes:
+            if gene in gene_to_index and gene not in ordered_genes:
+                ordered_genes.append(gene)
+
+        block_end = len(ordered_genes)
+        gene_block_boundaries.append((cell_type, block_start, block_end))
+
+    assert len(ordered_genes) == len(gene_to_index)
+
+    # Normalize gene expression
+    adata_temp = ad.AnnData(X=gene_matrix)
+    sc.pp.normalize_total(adata_temp, target_sum=1e6)
+    sc.pp.log1p(adata_temp)
+    normalized_matrix = adata_temp.X
+
+    # Calculate mean expression for each gene in each cell type
+    n_genes = len(ordered_genes)
+    n_cell_types = len(cell_type_names)
+    mean_expression_gene_by_celltype = np.zeros((n_genes, n_cell_types))
+    pixel_count_by_celltype = np.zeros(n_cell_types)
+
+    for ct_idx, cell_type in enumerate(cell_type_names):
+        cell_mask = cell_type_matrix[:, ct_idx].toarray().flatten().astype(bool)
+
+        if cell_mask.sum() > 0:  # If there are cells of this type
+            cell_expressions = normalized_matrix[cell_mask, :]
+            mean_expressions = np.array(cell_expressions.mean(axis=0)).flatten()
+            pixel_count_by_celltype[ct_idx] = cell_mask.sum()
+
+            # Reorder according to new gene ordering
+            for new_idx, gene in enumerate(ordered_genes):
+                old_idx = gene_to_index[gene]
+                mean_expression_gene_by_celltype[new_idx, ct_idx] = mean_expressions[old_idx]
+
+    xlabel_lines = []
+    for ct_idx, cell_type in enumerate(cell_type_names):
+        expr_count = mean_expression_gene_by_celltype.mean(0)[ct_idx]
+        pixel_count = pixel_count_by_celltype[ct_idx]
+        xlabel_lines.append(f'{cell_type}\nmean expr. {expr_count:.1e}' + r'$\times$' + f'{pixel_count:.1e} cells')
+
+    # Create figure
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(1, 1, 1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+
+    # Create heatmap
+    im = ax.imshow(mean_expression_gene_by_celltype, cmap='viridis', aspect='auto')
+
+    # Set ticks and labels
+    ax.set_xticks(range(n_cell_types))
+    ax.set_xticklabels(xlabel_lines, rotation=45, ha='center', fontsize=10)
+    ax.set_yticks(range(n_genes))
+    ax.set_yticklabels(ordered_genes, fontsize=8)
+
+    # Add colorbar
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label('Log-normalized Expression', fontsize=14)
+
+    # Add rectangles to highlight marker gene blocks
+    for cell_type, block_start, block_end in gene_block_boundaries:
+        if cell_type in cell_type_names:
+            ct_col_idx = cell_type_names.index(cell_type)
+
+            # Highlight the diagonal block for this cell type
+            block_height = block_end - block_start
+            if block_height > 0:
+                rect = Rectangle((ct_col_idx-0.5, block_start-0.5), 1, block_height,
+                               linewidth=2, edgecolor='firebrick', facecolor='none')
+                ax.add_patch(rect)
+
+    ax.set_xlabel('Cell Types', fontsize=18)
+    ax.set_ylabel('Genes', fontsize=18)
+    ax.set_title(batch_name + '\n1. total-count normalization s.t. each pixel has one million expressions. 2. log transform.', pad=12, fontsize=18)
+
+    fig.tight_layout(pad=2)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    fig.savefig(save_path, dpi=300)
+    plt.close()
+
+    return
 
 
 def quantify_statistics(batch_index: str,
@@ -258,6 +411,8 @@ def quantify_statistics(batch_index: str,
 
 
 if __name__ == '__main__':
+    plt.rcParams['font.family'] = 'sans-serif'
+
     # Get all genes of interest.
     celltype_related_genes = np.unique(sum(GENES_BY_CELL_TYPE.values(), []))
 
@@ -342,45 +497,56 @@ if __name__ == '__main__':
             celltype_related_matrix,
             GENES_BY_CELL_TYPE,
             gene_to_index,
+            batch_name=target_folder,
             fig_pc_save_path=f'./{dataset_name}/vis_celltype/{target_folder}_pc.png',
             fig_spatial_save_path=f'./{dataset_name}/vis_celltype/{target_folder}_spatial.png',
             spatial_location=barcode_position[['X', 'Y', 'pixel_row_in_highres', 'pixel_col_in_highres']],
             overlay_image=image)
 
-        if 'normal' in source_mat_folder:
-            disease_name = 'normal'
-        elif 'PAS' in source_mat_folder:
-            disease_name = 'PAS'
-        elif 'insufficient' in source_mat_folder:
-            disease_name = 'insufficient'
+        visualize_gene_expression_profiles(
+            gene_matrix=celltype_related_matrix,
+            cell_type_matrix=celltype_label_matrix,
+            cell_type_names=cell_type_names,
+            marker_gene_dict=GENES_BY_CELL_TYPE,
+            gene_to_index=gene_to_index,
+            batch_name=target_folder,
+            save_path=f'./{dataset_name}/vis_celltype/{target_folder}_expression_heatmap.png'
+        )
 
-        quantify_statistics(batch_index=batch_index,
-                            disease_name=disease_name,
-                            pixel_count=pixel_count,
-                            cell_type_counts=celltype_label_matrix.toarray().sum(axis=0),
-                            cell_type_names=cell_type_names,
-                            csv_path=f'./{dataset_name}/dataset_statistics.csv')
+        # if 'normal' in source_mat_folder:
+        #     disease_name = 'normal'
+        # elif 'PAS' in source_mat_folder:
+        #     disease_name = 'PAS'
+        # elif 'insufficient' in source_mat_folder:
+        #     disease_name = 'insufficient'
 
-        # Subset the data by spatial location.
-        cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
-                                  'pixel_col_bin': pd.cut(barcode_position['pixel_col_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
-                                  'pixel_row_in_highres': barcode_position['pixel_row_in_highres'],
-                                  'pixel_col_in_highres': barcode_position['pixel_col_in_highres'],
-                                  'cell_index': np.arange(len(barcode_position))})
+        # quantify_statistics(batch_index=batch_index,
+        #                     disease_name=disease_name,
+        #                     pixel_count=pixel_count,
+        #                     cell_type_counts=celltype_label_matrix.toarray().sum(axis=0),
+        #                     cell_type_names=cell_type_names,
+        #                     csv_path=f'./{dataset_name}/dataset_statistics.csv')
 
-        # Iterate over groups and save them separately.
-        iterator_bins = cell_bins.groupby(['pixel_row_bin', 'pixel_col_bin'])
-        for (row_bin, col_bin), group in tqdm(sorted(iterator_bins), total=len(iterator_bins)):
-            # Extract pixels corresponding to this group.
-            indices = group['cell_index'].values
-            if len(indices) < MIN_PIXEL_PER_GRAPH:
-                print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
-                continue
+        # # Subset the data by spatial location.
+        # cell_bins = pd.DataFrame({'pixel_row_bin': pd.cut(barcode_position['pixel_row_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
+        #                           'pixel_col_bin': pd.cut(barcode_position['pixel_col_in_highres'], bins=NUM_BINS, labels=False, include_lowest=True),
+        #                           'pixel_row_in_highres': barcode_position['pixel_row_in_highres'],
+        #                           'pixel_col_in_highres': barcode_position['pixel_col_in_highres'],
+        #                           'cell_index': np.arange(len(barcode_position))})
 
-            sub_matrix = celltype_label_matrix[indices, :]
-            sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
-            coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
-            sub_adata.obsm['spatial'] = coords
+        # # Iterate over groups and save them separately.
+        # iterator_bins = cell_bins.groupby(['pixel_row_bin', 'pixel_col_bin'])
+        # for (row_bin, col_bin), group in tqdm(sorted(iterator_bins), total=len(iterator_bins)):
+        #     # Extract pixels corresponding to this group.
+        #     indices = group['cell_index'].values
+        #     if len(indices) < MIN_PIXEL_PER_GRAPH:
+        #         print(f'Bin ({row_bin}, {col_bin}) has fewer than {MIN_PIXEL_PER_GRAPH} pixels ({len(indices)}). Skipping this bin.')
+        #         continue
 
-            os.makedirs(folder_out, exist_ok=True)
-            sub_adata.write(os.path.join(folder_out, f'{target_folder}_Bin-{str(row_bin).zfill(2)}-{str(col_bin).zfill(2)}_spatial_matrix.h5ad'))
+        #     sub_matrix = celltype_label_matrix[indices, :]
+        #     sub_adata = ad.AnnData(X=sub_matrix, obs=pd.DataFrame({'Location': group['cell_index']}), var=pd.DataFrame({'Cell Types': cell_type_names}))
+        #     coords = np.concatenate((group['pixel_row_in_highres'].values[:, None], group['pixel_col_in_highres'].values[:, None]), axis=1)
+        #     sub_adata.obsm['spatial'] = coords
+
+        #     os.makedirs(folder_out, exist_ok=True)
+        #     sub_adata.write(os.path.join(folder_out, f'{target_folder}_Bin-{str(row_bin).zfill(2)}-{str(col_bin).zfill(2)}_spatial_matrix.h5ad'))
