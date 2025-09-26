@@ -23,14 +23,14 @@ MIN_PIXEL_PER_GRAPH = 15
 
 GENES_BY_CELL_TYPE = {
     'Cytotrophoblasts': ['LARGE2', 'LGR5', 'LRP2', 'SLC22A11', 'SLC13A3', 'SLC16A12', 'PEG10', 'NFE2L3'],
-    'Decidual-cells': ['RBP4', 'EPYC', 'SERPINA3', 'PRL', 'CHRDL1', 'CA12', 'SCARA5', 'DKK1', 'ALDH1A2', 'NDP', 'CHI3L2'],
-    'Extravillous-trohpoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
+    'Decidual-cells': ['IGFBP1', 'RBP4', 'CRLF1', 'PRL', 'DKK1'],
+    'Extravillous-trophoblast': ['DIO2', 'LAMA3', 'NOG', 'ASCL2', 'PLAC8', 'FSTL3', 'LY6D', 'COL17A1', 'NOTUM', 'PRG2'],
     'Endothelial-cells-1': ['APLN', 'AREG', 'WNT3A', 'EGFL7', 'MMRN2', 'AGTR1', 'COX4I2', 'LRRC36'],
-    'Endothelial-cells-2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2',
-                            'PITX2'],
+    'Endothelial-cells-2': ['CADM3', 'RSPO2', 'CTHRC1', 'PROM1', 'WNT2', 'SLC16A10', 'MATN2', 'COL8A2', 'PITX2'],
     'Hofbauer-cells': ['RGS1', 'CTSW', 'DUSP2', 'CCL5', 'CD96', 'GBP5', 'CCL4', 'C1QC', 'FCGBP', 'SCN9A', 'FGL1',
                        'CD28', 'GRIN2C', 'STAB1', 'LPAR5', 'C3AR1'],
-    'Mixed-immune-cells': ['IGKC', 'IGHG1', 'DES', 'CNN1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
+    'Mixed-immune-cells': ['IGKC', 'IGHG1', 'ACTG2', 'PAEP', 'TNC', 'MMP12', 'PCP4'],
+    'Myometrial-cells': ['ACTA2', 'CALD1', 'DES', 'CNN1', 'TAGLN'],
     'Smooth-muscle-cells': ['CCL21', 'MMRN1', 'FHL5', 'LCN6', 'LCN10', 'CCL14', 'RELN', 'SULF1', 'TBX1', 'CPE',
                             'HOXD9', 'THBS2', 'IGFBP7'],
     'Syncytiotrophoblast': ['ACOXL', 'IGHA1', 'TCHH', 'GH2', 'TRIM40', 'CSH2', 'PSG7', 'PSG4', 'ALPP', 'CYP19A1',
@@ -323,7 +323,9 @@ def visualize_gene_expression_profiles(gene_matrix: sparse._csr.csr_matrix,
     for ct_idx, cell_type in enumerate(cell_type_names):
         expr_count = mean_expression_gene_by_celltype.mean(0)[ct_idx]
         pixel_count = pixel_count_by_celltype[ct_idx]
-        xlabel_lines.append(f'{cell_type}\nmean expr. {expr_count:.1e}' + r'$\times$' + f'{pixel_count:.1e} cells')
+        pixel_percentage = pixel_count / pixel_count_by_celltype.sum() * 100
+        xlabel_lines.append(f'{cell_type}\nmean expr. {expr_count:.1e}'
+                            f'\ntotal pixels {pixel_count:.1e} ({pixel_percentage:.1f}%)')
 
     # Create figure
     fig = plt.figure(figsize=figsize)
@@ -337,7 +339,7 @@ def visualize_gene_expression_profiles(gene_matrix: sparse._csr.csr_matrix,
 
     # Set ticks and labels
     ax.set_xticks(range(n_cell_types))
-    ax.set_xticklabels(xlabel_lines, rotation=45, ha='center', fontsize=10)
+    ax.set_xticklabels(xlabel_lines, rotation=45, ha='right', fontsize=10)
     ax.set_yticks(range(n_genes))
     ax.set_yticklabels(ordered_genes, fontsize=8)
 
@@ -351,6 +353,7 @@ def visualize_gene_expression_profiles(gene_matrix: sparse._csr.csr_matrix,
             ct_col_idx = cell_type_names.index(cell_type)
 
             # Highlight the diagonal block for this cell type
+            # NOTE: This only works if all markers are unique to each cell type.
             block_height = block_end - block_start
             if block_height > 0:
                 rect = Rectangle((ct_col_idx-0.5, block_start-0.5), 1, block_height,
