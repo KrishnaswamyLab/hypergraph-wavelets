@@ -10,6 +10,8 @@ warnings.filterwarnings("ignore")
 
 folder_in = '../../data/MIBI/raw/'
 folder_out = '../../data/MIBI/patchified_all_genes/'
+genes_to_drop = ["dsDNA",  "beta-tubulin", "HLA class 1 A, B, and C, Na-K-ATPase"]
+
 MIN_CELL_PER_GRAPH = 20
 BIN_SIZE_RATIO = 0.25
 TARGET_NUM_SUBGRAPHS = 128
@@ -28,36 +30,32 @@ if __name__ == '__main__':
         assert patient_id in cell_by_protein.id.values, 'Patient ID mismatch.'
 
         # Construct `barcodes`.
-        cell_info = cell_by_protein.copy()
-        cell_info = cell_info.loc[cell_info.id == patient_id]
-        cell_info = cell_info.drop(['area'], axis=1)
-        barcodes = 'patient_' + cell_info.id + '-cell_' + cell_info['label'].apply(lambda x: str(x).zfill(4))
-        barcodes = pd.DataFrame(barcodes, columns=['barcode'])
-        barcodes['X'] = cell_info['x_centroid'].astype(int)
-        barcodes['Y'] = cell_info['y_centroid'].astype(int)
-        del cell_info
+        # Data for a specific patient.
+        patient_data = cell_by_protein.loc[cell_by_protein.id == patient_id].copy()
+
+        # Create barcodes:
+        barcodes = pd.DataFrame({
+            'barcode': 'patient_' + patient_data['id'] + '-cell_' + patient_data['label'].apply(lambda x: str(x).zfill(4)),
+            'X': patient_data['x_centroid'].astype(int),
+            'Y': patient_data['y_centroid'].astype(int)
+        })
 
         # Construct `features`.
-        features = cell_by_protein.columns.values.tolist()
-        for key in ['id', 'unique_id', 'label', 'area', 'x_centroid', 'y_centroid']:
-            features.remove(key)
+        # Drop all unwanted columns
+        matrix = patient_data.drop(['id', 'unique_id', 'label', 'area'] + genes_to_drop, axis=1)
 
-        # Construct `matrix`.
-        matrix = cell_by_protein.copy()
-        matrix = matrix.loc[matrix['id'] == patient_id]
-        matrix = matrix.drop(['id', 'unique_id', 'label', 'area'], axis=1)
+        # Construct features (all columns except coordinates)
+        features = [col for col in matrix.columns if col not in ['x_centroid', 'y_centroid']]
 
         # Normalize the gene expression for each cell.
-        # Be careful not to normalize the coordinates!
-        cell_by_gene = matrix.drop(['x_centroid', 'y_centroid'], axis=1)
-        assert (cell_by_gene.keys() == features).all()
+        cell_by_gene = matrix[features]
         adata = ad.AnnData(X=cell_by_gene, var=pd.DataFrame(index=features))
+
         sc.pp.normalize_total(adata, target_sum=1e6)
         sc.pp.log1p(adata)
         matrix.loc[:, features] = adata.X
 
-        variable_df = pd.DataFrame({'Gene Expression': features})
-        variable_df.index = features
+        variable_df = pd.DataFrame({'Gene Expression': features}, index=features)
 
         label_binary = patient_labels.loc[patient_labels.id == patient_id]['response_binary'].values.item()
         label_multi = patient_labels.loc[patient_labels.id == patient_id]['response_multi'].values.item()
