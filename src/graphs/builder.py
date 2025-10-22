@@ -621,7 +621,7 @@ def create_knn_graph(adata, K: int = 10):
     return G
 
 
-def return_graph_data(adata, mode: str = 'voronoi'):
+def return_spatial_graph_data(adata, mode: str = 'voronoi'):
     '''
     NOTE: We won't do normalization here!
     Please do your normalization beforehand if needed.

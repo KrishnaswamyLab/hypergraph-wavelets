@@ -34,3 +34,12 @@ Each one of those can be computed on the following scripts:
 ```python3 vendi.py```
 
 ```python3 linear_probing.py```
+
+
+## Preprocessing MIBI dataset
+
+Once you have the raw data installed under data/MIBI/raw, you should run:
+
+```
+python preprocess_MIBI_patchify_all_genes.py 
+```

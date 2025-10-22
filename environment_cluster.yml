@@ -1,4 +1,4 @@
-name: hypergraph
+name: hypergraph-cuda
 channels:
   - pytorch
   - pyg
@@ -8,9 +8,7 @@ channels:
 dependencies:
   - python=3.9
   - pip
-  - pyg
   - einops
-  - pytorch-lightning
   - numpy
   - scipy
   - pandas
@@ -24,9 +22,6 @@ dependencies:
   - networkx
   - anndata
   - scanpy
+  - pytest
   - pip:
-    - torch
-    - torchvision
-    - torchaudio
     - geovoronoi
-    - graphtools==1.5.3

@@ -172,3 +172,5 @@ cython_debug/
 data/*
 reports/*
 !reports/.gitkeep
+
+results/*

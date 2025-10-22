@@ -9,8 +9,8 @@ import torch
 
 from src.hypergraphs.featurizers import get_hyperedge_features
 from src.models.hypergraph_scattering import HSN
-from src.hypergraphs.hypergraph_utils import HGDataset, data_to_hg
-from src.graphs.builder import return_graph_data
+from src.hypergraphs.hypergraph_utils import HGDataset, spatial_graph_to_hypergraph
+from src.graphs.builder import return_spatial_graph_data
 
 # my defaults are python main.py --data_dir data/ --output_dir wavelet_features/ --k_hop 1 
 # for hyperedge averaging: main.py --data_dir data/ --output_dir hyperedge_avg/ --k_hop 3 --hyperedge_features gene_expression --wavelets 0
@@ -53,12 +53,12 @@ if __name__ == '__main__':
         dataset_path = os.path.join(DATA_DIR,dataset_name)
         print(dataset_name)
         adata = ad.read_h5ad(dataset_path)
-        data = return_graph_data(adata,norm_target_sum=norm_target_sum)
+        data = return_spatial_graph_data(adata,norm_target_sum=norm_target_sum)
 
         original_dataset = [data]
 
-        to_hg_func = lambda g: data_to_hg(g, add_k_hop=k_hop)
-        dataset = HGDataset(original_dataset, data_to_hg)
+        to_hg_func = lambda g: spatial_graph_to_hypergraph(g, add_k_hop=k_hop)
+        dataset = HGDataset(original_dataset, spatial_graph_to_hypergraph)
         # honestly gpu speed up is incremental
         
         model = HSN(in_channels=180, 
