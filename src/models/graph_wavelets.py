@@ -1,8 +1,8 @@
 """
-SN rewritten with pytorch geometric, can operate on batched hypergraphs. 
+SN rewritten with pytorch geometric, can operate on batched hypergraphs.
 the data is stored in the format of pytorch geometric.
 see https://github.com/pyg-team/pytorch_geometric/blob/cf24b4bcb4e825537ba08d8fc5f31073e2cd84c7/torch_geometric/data/hypergraph_data.py
-for example: 
+for example:
     hyperedge_index = torch.tensor([
         [0, 1, 2, 1, 2, 3],
         [0, 0, 0, 1, 1, 1],
@@ -17,9 +17,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Optional
 from einops import rearrange
-from torch.nn import Linear 
-from torch_geometric.nn.pool import global_mean_pool 
-from torch_geometric.nn import GCNConv 
+from torch.nn import Linear
+from torch_geometric.nn.pool import global_mean_pool
+from torch_geometric.nn import GCNConv
 from torch_geometric.nn.norm import BatchNorm
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import scatter, softmax
@@ -32,7 +32,7 @@ from .hypergraph_scattering import LazyLayer
 
 class Diffusion(MessagePassing):
     def __init__(
-            self, 
+            self,
             in_channels: int,
             out_channels: int,
             trainable_laziness=False,
@@ -59,12 +59,12 @@ class Diffusion(MessagePassing):
         if not self.fixed_weights:
             self.lin_self = torch.nn.Linear(in_channels, out_channels)
             self.lin_neigh = torch.nn.Linear(in_channels, out_channels)
-    
+
     def forward(self, x: torch.Tensor, hyperedge_index: torch.Tensor,
                 hyperedge_weight: Optional[torch.Tensor] = None,
                 hyperedge_attr: Optional[torch.Tensor] = None,
                 num_edges: Optional[int] = None) -> Tuple[torch.Tensor, torch.Tensor]:
-        
+
         num_nodes = x.size(0)
 
         if num_edges is None:
@@ -74,7 +74,7 @@ class Diffusion(MessagePassing):
 
         if hyperedge_weight is None:
             hyperedge_weight = x.new_ones(num_edges)
-        
+
         # this is the degree of the vertices (taken inverse)
         D_v_inv = scatter(hyperedge_weight[hyperedge_index[1]], hyperedge_index[0],
                     dim=0, dim_size=num_nodes, reduce='sum')
@@ -85,7 +85,7 @@ class Diffusion(MessagePassing):
         #             dim=0, dim_size=num_edges, reduce='sum')
         # D_he_inv = 1.0 / D_he_inv
         # D_he_inv[D_he_inv == float("inf")] = 0
-    
+
         if self.normalize == "left":
             # out_edge = self.propagate(hyperedge_index, x=x, norm=D_he_inv,
             #                     size=(num_nodes, num_edges))
@@ -118,25 +118,25 @@ class Diffusion(MessagePassing):
             out_node = self.propagate(hyperedge_index, x=out, norm=D_v_inv_sqrt,
                     size=(num_edges, num_nodes))
             out_node = self.laziness_weight_process_node(out_node, x)
-        else: 
+        else:
             raise ValueError(f"normalize must be one of 'right', 'left', or 'symmetric', not {self.normalize}")
         return out_node, None
-    
+
     def message(self, x_j: torch.Tensor, norm_i: Optional[torch.Tensor] = None) -> torch.Tensor:
         if norm_i is None:
             out = x_j
         else:
             out = norm_i.view(-1, 1) * x_j
         return out
-    
+
     def laziness_weight_process_edge(self, out_edge, hyperedge_attr):
         if not self.fixed_weights:
-            out_edge = self.lin_neigh(out_edge) 
+            out_edge = self.lin_neigh(out_edge)
             hyperedge_attr = self.lin_self(out_edge)
         if self.trainable_laziness and hyperedge_attr is not None:
             out_edge = self.lazy_layer(out_edge, hyperedge_attr)
         return out_edge
-    
+
     def laziness_weight_process_node(self, out_node, x):
         if not self.fixed_weights:
             out_node = self.lin_neigh(out_node)
@@ -212,7 +212,7 @@ class ScatteringModule(nn.Module):
         s_nodes = rearrange(activated, 'a w n f -> n (w f a)') if self.reshape else torch.stack(activated)
         # s_edges = rearrange(activated_edges, 'a w e f -> e (w f a)') if self.reshape else torch.stack(activated_edges)
         return s_nodes, None
-    
+
     def out_features(self):
         # return 6 * self.in_channels * len(self.activations)
         return 3 * self.in_channels * len(self.activations)
@@ -261,15 +261,15 @@ class SN(pl.LightningModule):
 
     """
 
-    def __init__(self, 
-                in_channels, 
-                hidden_channels, 
-                out_channels, 
-                trainable_laziness=False, 
-                trainable_scales=False, 
-                activation="modulus", 
-                fixed_weights=True, 
-                layout=['hsm', 'hsm'], 
+    def __init__(self,
+                in_channels,
+                hidden_channels,
+                out_channels,
+                trainable_laziness=False,
+                trainable_scales=False,
+                activation="modulus",
+                fixed_weights=True,
+                layout=['hsm', 'hsm'],
                 normalize="right",
                 pooling=None,
                 task='classification', # assume on node only (not on hypergraphs)
@@ -277,14 +277,14 @@ class SN(pl.LightningModule):
                 weight_decay=1e-5,
                 **kwargs):
         super().__init__()
-        self.in_channels = in_channels 
+        self.in_channels = in_channels
         self.out_channels = out_channels
         self.hidden_channels = hidden_channels
-        self.trainable_laziness = trainable_laziness 
-        self.trainable_scales = trainable_scales 
-        self.activation = activation 
+        self.trainable_laziness = trainable_laziness
+        self.trainable_scales = trainable_scales
+        self.activation = activation
         self.fixed_weights = fixed_weights
-        self.layout = layout 
+        self.layout = layout
         self.layers = []
         self.out_dimensions = [in_channels]
         self.normalize = normalize
@@ -306,10 +306,10 @@ class SN(pl.LightningModule):
 
         for layout_ in layout:
             if layout_ == 'hsm':
-                self.layers.append(ScatteringModule(self.out_dimensions[-1], 
+                self.layers.append(ScatteringModule(self.out_dimensions[-1],
                                                             trainable_laziness=trainable_laziness,
-                                                            trainable_scales=self.trainable_scales, 
-                                                            activation=self.activation, 
+                                                            trainable_scales=self.trainable_scales,
+                                                            activation=self.activation,
                                                             fixed_weights=self.fixed_weights,
                                                             normalize=normalize,
                                                             scale_list=self.scale_list
@@ -322,13 +322,13 @@ class SN(pl.LightningModule):
                 self.layers.append(nn.Linear(input_dim, output_dim))
             else:
                 raise ValueError("Not yet implemented")
-             
+
         self.layers = nn.ModuleList(self.layers)
         self.batch_norm = BatchNorm(self.out_dimensions[-1])
 
         self.fc1 = Linear(self.out_dimensions[-1], self.out_dimensions[-1] // 2)
         self.fc2 = nn.Linear(self.out_dimensions[-1] // 2, self.out_channels)
-        
+
         self.relu = nn.ReLU()
         self.batch_norm1 = nn.BatchNorm1d(self.out_dimensions[-1] // 2)
 
@@ -369,7 +369,7 @@ class SN(pl.LightningModule):
         """
         # row, col = hyperedge_index
         # edge_batch = batch[row]
-        curr_value = 0 
+        curr_value = 0
         node_in_hyperedge = []
         for ind,val in enumerate(hyperedge_index[1,:]):
             if val == curr_value:
@@ -383,10 +383,10 @@ class SN(pl.LightningModule):
                 # TODO add batch norm before non-linearity inside the hsm!
             elif self.layout[il] == 'dim_reduction':
                 x = layer(x) # TODO add batch norm and non-linearity!
-                hyperedge_attr = layer(hyperedge_attr) 
+                hyperedge_attr = layer(hyperedge_attr)
             else:
                 raise ValueError
-            
+
         if self.task == 'classification':
             # Apply selected pooling
             if self.pooling is not None:
@@ -395,7 +395,6 @@ class SN(pl.LightningModule):
                 x = global_mean_pool(x, batch)
                 hyperedge_attr = global_mean_pool(hyperedge_attr, batch)
             elif self.pooling == 'max':
-                #import pdb; pdb.set_trace()
                 x = global_max_pool(x, batch)
                 if edge_batch is not None:
                     hyperedge_attr = global_max_pool(hyperedge_attr, edge_batch)
@@ -404,14 +403,14 @@ class SN(pl.LightningModule):
                 hyperedge_attr = global_add_pool(hyperedge_attr, batch)
             elif self.pooling == 'attention':
                 # use a hyper GNN to learn attention weights?? I don't know...
-                
+
                 raise NotImplementedError
                 # x = self.attention_pool(x, batch)
                 # hyperedge_attr = self.attention_pool(hyperedge_attr, batch)
         #x = self.batch_norm(x)
         if self.task != 'node_representation':
             x = self.mlp(x)
-        
+
         # compute the same process on the edges:
         #hyperedge_attr = self.batch_norm(hyperedge_attr)
         #hyperedge_attr = self.mlp(hyperedge_attr)
@@ -426,10 +425,8 @@ class SN(pl.LightningModule):
     def common_step(self, batch, batch_idx, phase):
         x, edge_index, edge_attr, y, batch_id = batch.x, batch.edge_index, batch.edge_attr, batch.y, batch.batch
         out, _ = self.forward(x, edge_index, hyperedge_attr=edge_attr, batch=batch_id)
-        #import pdb; pdb.set_trace()
         #y = y[0]
         if self.task == 'classification':
-            #import pdb; pdb.set_trace()
             loss = F.cross_entropy(out, y) # set to y[0] for spacegm, this may break things later
         elif self.task == 'regression':
             loss = F.mse_loss(out, y)
@@ -437,10 +434,10 @@ class SN(pl.LightningModule):
             loss = 0
         else:
             raise ValueError(f"task must be one of 'classification' or 'regression', not {self.task}")
-    
+
         # Logging metrics
         self.log(f'{phase}_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        
+
         if self.task == 'classification':
             acc = self.accuracy(out, y)
             auc = self.auroc(out, y)
@@ -458,7 +455,7 @@ class SN(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         loss = self.common_step(batch, batch_idx, 'test')
-    
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer

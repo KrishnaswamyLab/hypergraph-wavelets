@@ -208,10 +208,11 @@ class HyperScatteringModule(nn.Module):
         node_emb = torch.einsum("ij,jkl->ikl", self.wavelet_constructor, diffusion_levels) # shape: [J,num_nodes,feat_dim]
         edge_emb = torch.einsum("ij,jkl->ikl", self.wavelet_constructor, edge_diffusion_levels) # shape: [J,num_edges,feat_dim]
 
+        # NOTE: without `.clone()`, we will have `grad_fn=<UnsafeViewBackward0>`.
         # [scales, nodes, features] -> [nodes, scales * features]
-        node_emb = rearrange(node_emb, 's n f -> n (s f)') if self.reshape else node_emb
+        node_emb = rearrange(node_emb, 's n f -> n (s f)').clone() if self.reshape else node_emb
         # [scales, edges, features] -> [edges, scales * features]
-        edge_emb = rearrange(edge_emb, 's e f -> e (s f)') if self.reshape else edge_emb
+        edge_emb = rearrange(edge_emb, 's e f -> e (s f)').clone() if self.reshape else edge_emb
 
         return node_emb, edge_emb
 
@@ -246,7 +247,8 @@ class FeatureSelfAttention(nn.Module):
 
     def forward(self, x, return_attn: bool = False):
         '''
-        The shape of x is [B, F, S]: (batch size, num_features, scattering_scales).
+        The shape of `x` is [B, F, S]: (batch size, num_features, scattering_scales).
+        NOTE: In our case, `x` is the hyperedge features.
         '''
         # Apply self-attention across the feature dimension (F positions)
         x, attn_weights = self.attn(x, x, x)  # [B, F, S]
@@ -262,14 +264,18 @@ class NicheAttention(nn.Module):
         super().__init__()
         self.gate_nn = nn.Linear(num_features, 1)
 
-    def forward(self, x, batch, return_attn=False): #x.shape = [num_nodes, num_features]
+    def forward(self, x, batch, return_attn=False):
+        '''
+        The shape of `x` is [num_nodes, num_features].
+        NOTE: In our case, `x` is the hyperedge features.
+        '''
         gate_scores = self.gate_nn(x).squeeze(-1)                        # [num_nodes]
         attn_weights = scatter_softmax(gate_scores, batch)               # [num_nodes]
         out = scatter_sum(x * attn_weights.unsqueeze(-1), batch, dim=0)  # [B, num_features]
 
         if return_attn:
             return out, attn_weights
-        
+
         return out
 
 
@@ -439,23 +445,23 @@ class HypergraphScatteringNet(nn.Module):
                 hyperedge_attr = global_add_pool(hyperedge_attr, batch)
         elif self.pooling == 'attention':
             if return_attention:
-                x, niche_attn = self.niche_attention(x, batch, return_attn=True)
+                hyperedge_attr, niche_attn = self.niche_attention(hyperedge_attr, batch, return_attn=True)
             else:
-                x = self.niche_attention(x, batch)
+                hyperedge_attr = self.niche_attention(hyperedge_attr, batch)
         else:
             raise ValueError(f'Pooling method {self.pooling} not supported.')
 
         # Isolate the scattering scales to a separate dimension.
-        x = rearrange(x, 'b (s f) -> b f s', s=len(self.scale_list))
+        hyperedge_attr = rearrange(hyperedge_attr, 'b (s f) -> b f s', s=len(self.scale_list))
 
         if return_attention:
-            x, feature_attn = self.feature_attention(x, return_attn=True)
+            hyperedge_attr, feature_attn = self.feature_attention(hyperedge_attr, return_attn=True)
             return niche_attn, feature_attn
 
-        x = self.feature_attention(x)
-        x = self.classifier(x)
+        hyperedge_attr = self.feature_attention(hyperedge_attr)
+        hyperedge_attr = self.classifier(hyperedge_attr)
         # NOTE: Do not add softmax here, because torch.nn.CrossEntropyLoss() internally performs softmax.
-        return x
+        return hyperedge_attr
 
 
 if __name__ == '__main__':

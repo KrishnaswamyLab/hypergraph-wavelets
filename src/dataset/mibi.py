@@ -97,7 +97,7 @@ class MIBIDataset(Dataset):
             subject_id = os.path.basename(graph_path).split('-')[0]
             assert subject_id[:8] == 'patient_'
             unique_subject_ids.append(subject_id)
-        
+
         unique_subject_ids = natsorted(unique_subject_ids)
 
         # Initialize lists
@@ -108,7 +108,7 @@ class MIBIDataset(Dataset):
         for graph_path in graph_path_list:
             subject_id = os.path.basename(graph_path).split('-')[0]
             graph_str = os.path.basename(graph_path)
-            
+
             if 'responseM_PD' in graph_str:
                 graph_class = 0
             elif 'responseM_SD' in graph_str:
@@ -119,12 +119,12 @@ class MIBIDataset(Dataset):
                 graph_class = 3
             else:
                 raise ValueError(f'`graph_str` must contain responseM_PD/SD/PR/CR, but got {graph_str}.')
-            
+
             subject_id_idx = unique_subject_ids.index(subject_id)
             self.graph_path_by_subject[subject_id_idx].append(graph_path)
             self.class_by_subject[subject_id_idx].append(graph_class)
         return
-    
+
     def __len__(self) -> int:
         return len(self.graph_path_by_subject)
 
@@ -190,8 +190,11 @@ class MIBISubsetHypergraph(MIBISubset):
         if self.transform:
             graph_data = self.transform(graph_data)
 
-        hypergraph = spatial_graph_to_hypergraph(graph_data, adata, hyperedge_features_list=self.hyperedge_features_list, add_k_hop=self.k_hop)
-        
+        hypergraph = spatial_graph_to_hypergraph(graph_data=graph_data,
+                                                 adata=adata,
+                                                 hyperedge_features_list=self.hyperedge_features_list,
+                                                 add_k_hop=self.k_hop)
+
         return hypergraph
 
 if __name__ == '__main__':

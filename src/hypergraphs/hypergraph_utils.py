@@ -31,7 +31,7 @@ def spatial_graph_to_hypergraph(graph_data, adata, hyperedge_features_list, k_ho
         Number of hops for neighborhood extraction
     **kwargs : dict
         Additional parameters passed to get_hyperedge_features
-    
+
     Returns:
     --------
     HyperGraphData : object
@@ -47,16 +47,16 @@ def spatial_graph_to_hypergraph(graph_data, adata, hyperedge_features_list, k_ho
             continue
 
         subset, edge_index, mapping, edge_mask = torch_geometric.utils.k_hop_subgraph(
-            node_idx=node_idx, 
-            num_hops=k_hop, 
-            edge_index=edge_index_undirected, 
+            node_idx=node_idx,
+            num_hops=k_hop,
+            edge_index=edge_index_undirected,
             relabel_nodes=False
         )
-        
+
         hyperedges.append(subset.tolist())
 
     hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
-    
+
     hyperedge_attr = get_hyperedge_features(
         graph_data=graph_data,
         adata=adata,
@@ -67,9 +67,9 @@ def spatial_graph_to_hypergraph(graph_data, adata, hyperedge_features_list, k_ho
     )
 
     return HyperGraphData(
-        x=graph_data.x, 
-        edge_index=hyperedge_index, 
-        edge_attr=hyperedge_attr, 
+        x=graph_data.x,
+        edge_index=hyperedge_index,
+        edge_attr=hyperedge_attr,
         y=torch.from_numpy(np.array(graph_data.y))
     )
 

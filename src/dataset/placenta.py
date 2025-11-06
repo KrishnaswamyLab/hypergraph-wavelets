@@ -33,10 +33,12 @@ class PlacentaDataset(Dataset):
     def __init__(self,
                  data_folder: str = '../../data/spatial_placenta_accreta/patchified_all_genes',
                  k_hop: int = 3,
+                 hyperedge_features_list: List[str] = ['gene_expression'],
                  transform=None):
 
         self._load_data(data_folder)
         self.k_hop = k_hop
+        self.hyperedge_features_list = hyperedge_features_list
         self.transform = transform
         self.gene_list = self._read_gene_list()
 
@@ -115,7 +117,10 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
         if self.transform:
             graph_data = self.transform(graph_data)
 
-        hypergraph = spatial_graph_to_hypergraph(graph_data, add_k_hop=self.k_hop)
+        hypergraph = spatial_graph_to_hypergraph(graph_data=graph_data,
+                                                 adata=adata,
+                                                 hyperedge_features_list=self.hyperedge_features_list,
+                                                 add_k_hop=self.k_hop)
 
         return hypergraph
 
