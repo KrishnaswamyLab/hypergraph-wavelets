@@ -7,64 +7,139 @@ from src.models.hypergraph_scattering import HyperDiffusion
 from src.utils.cell_categories import retrieve_all_cell_types_categories
 from tqdm import tqdm
 
-def cell_type_feat(adata, dataset):
-    #Retrieve all possible cell_types
+def cell_type_distribution_feature(adata, hyperedges):
+    """
+    TODO: THIS IS HARD CODED FOR BRAIN ATLAS DATASET
+
+    Compute cell type histogram features for hyperedges by aggregating
+    cell types of nodes within each hyperedge.
     
-    # we want to do aggregation based on the different granularities of cell types
+    Parameters:
+    -----------
+    adata : AnnData
+        Annotated data object with cell type information
+    hyperedges : list
+        List of hyperedges (list of node indices for each hyperedge)
+    
+    Returns:
+    --------
+    hyperedge_features : torch.Tensor
+        Cell type count features for each hyperedge (num_hyperedges, num_features)
+    """
+    # Retrieve all possible cell_types
     complete_cell_types_df = retrieve_all_cell_types_categories(adata)
     enc_df = pd.get_dummies(complete_cell_types_df)
-    encoded_data = torch.tensor(enc_df.values, dtype=torch.float)
-
-    # message pass into the hyperedges
-    types_conv = CountCellTypesConv()
-    data = HyperGraphData(edge_index = dataset[0].edge_index, x = encoded_data)
-    node_feature_counts = types_conv(data.x, data.edge_index)
-    count_df = pd.DataFrame(node_feature_counts.detach().numpy(), columns=enc_df.columns).astype(int)
     
-    # intersect the columns that start with Class_
-    class_cols = [col for col in count_df.columns if col.startswith('Class_')]
-    class_col_df = count_df[class_cols]
-    subclass_cols = [col for col in count_df.columns if col.startswith('Subclass_')]
-    subclass_col_df = count_df[subclass_cols]
-    supertype_cols = [col for col in count_df.columns if col.startswith('Supertype_')]
-    supertype_col_df = count_df[supertype_cols]
+    # Aggregate cell types for each hyperedge
+    hyperedge_features = []
+    for hyperedge in hyperedges:
+        # Sum the one-hot encoded cell types for all nodes in this hyperedge
+        hyperedge_cell_types = enc_df.iloc[hyperedge].sum(axis=0)
+        hyperedge_features.append(hyperedge_cell_types.values)
+    
+    hyperedge_features = torch.tensor(hyperedge_features, dtype=torch.float)
+    return hyperedge_features
 
-    count_df = torch.tensor(count_df.values, dtype=torch.float)
-    return count_df
 
-def gene_expression_feat(adata, dataset):
-    # GENE EXPRESSION FEATURIZATION
-    data_gene = HyperGraphData(edge_index = dataset[0].edge_index, x = dataset[0].x, edge_attr = dataset[0].edge_attr)
+def gene_expression_feature(hyperedges, hyperedge_index, node_features):
+    """
+    Compute gene expression features for hyperedges using diffusion.
+    
+    Parameters:
+    -----------
+    hyperedges : list
+        List of hyperedges
+    hyperedge_index : torch.Tensor
+        Hyperedge index tensor [2, num_connections]
+    node_features : torch.Tensor
+        Node gene expression features
+    
+    Returns:
+    --------
+    edge_feat : torch.Tensor
+        Diffused gene expression features for hyperedges
+    """
+    num_hyperedges = len(hyperedges)
+          
+    # Initialize hyperedge attributes (e.g., mean of nodes in each hyperedge)
+    initial_edge_attr = torch.zeros(num_hyperedges, node_features.shape[1])
+
+    for i, hyperedge in enumerate(hyperedges):
+        initial_edge_attr[i] = node_features[hyperedge].mean(dim=0)
+    
+    data_gene = HyperGraphData(
+        edge_index=hyperedge_index, 
+        x=node_features, 
+        edge_attr=initial_edge_attr
+    )
+    
     diffuser = HyperDiffusion(in_channels=180, out_channels=180)
-    _, edge_feat = diffuser(data_gene.x, data_gene.edge_index, hyperedge_attr = data_gene.edge_attr)
+    _, edge_feat = diffuser(data_gene.x, data_gene.edge_index, hyperedge_attr=data_gene.edge_attr)
+    
     return edge_feat
 
-def diffused_gene_correlation(adata, dataset, num_diffusions = 1):
-    original_data = dataset[0].x
-    data_gene = HyperGraphData(edge_index = dataset[0].edge_index, x = dataset[0].x, edge_attr = dataset[0].edge_attr)
-    diffuser = HyperDiffusion(in_channels=180, out_channels=180)
+def diffused_gene_correlation(hyperedges, hyperedge_index, node_features, num_diffusions=1):
+    """
+    Compute correlation between original and diffused gene expression within each hyperedge.
+    
+    Parameters:
+    -----------
+    hyperedges : list
+        List of hyperedges
+    hyperedge_index : torch.Tensor
+        Hyperedge index tensor [2, num_connections]
+    node_features : torch.Tensor
+        Node gene expression features
+    num_diffusions : int
+        Number of diffusion steps to apply
+    
+    Returns:
+    --------
+    hyperedge_correlations : torch.Tensor
+        Correlation features for each hyperedge (num_hyperedges, num_genes)
+    """
+    num_hyperedges = len(hyperedges)
+    original_data = node_features
+    
+    # Initialize hyperedge attributes (e.g., mean of nodes in each hyperedge)
+    initial_edge_attr = torch.zeros(num_hyperedges, node_features.shape[1])
+    for i, hyperedge in enumerate(hyperedges):
+        initial_edge_attr[i] = node_features[hyperedge].mean(dim=0)
+    
+    # Create hypergraph data
+    data_gene = HyperGraphData(
+        edge_index=hyperedge_index, 
+        x=node_features, 
+        edge_attr=initial_edge_attr
+    )
+    
+    # Apply diffusion
+    diffuser = HyperDiffusion(in_channels=node_features.shape[1], out_channels=node_features.shape[1])
     node_feat = data_gene.x
-    _edge_feat = data_gene.edge_attr
+    edge_feat = data_gene.edge_attr
+    
     for i in range(num_diffusions):
-        node_feat, _edge_feat = diffuser(data_gene.x, data_gene.edge_index, hyperedge_attr = _edge_feat)
+        node_feat, edge_feat = diffuser(node_feat, data_gene.edge_index, hyperedge_attr=edge_feat)
+    
     diffused_data = node_feat
-
-    hyperedges = dataset[0].edge_index[1].unique() # check the convention on edge_index for hpyeredges
-    hyperedge_correlations = torch.zeros((len(hyperedges), dataset[0].x.shape[1]))
+    
+    # Compute correlations for each hyperedge
+    hyperedge_correlations = []
     for hyperedge in tqdm(hyperedges, desc='Diffused Gene Correlation'):
-        # get nodes in each hyperedge
-        nodes = dataset[0].edge_index[0][dataset[0].edge_index[1] == hyperedge]
-        # get the correlation between the original data and the diffused data
-        original_data_hyperedge = original_data[nodes].T
-        diffused_data_hyperedge = diffused_data[nodes].T
-        for ind, (x,y) in enumerate(zip(original_data_hyperedge, diffused_data_hyperedge)):
-            hyperedge_correlations[hyperedge, ind] = torch.corrcoef(torch.stack((x, y)))[0,1]
+        # Get original and diffused data for this hyperedge
+        original_data_hyperedge = original_data[hyperedge].T  # (num_genes, num_nodes)
+        diffused_data_hyperedge = diffused_data[hyperedge].T  # (num_genes, num_nodes)
         
-        #correlation = np.corrcoef(stacked, rowvar=False)[0,1,:]
-
+        # Compute correlation for each gene
+        correlations = []
+        for orig_gene, diff_gene in zip(original_data_hyperedge, diffused_data_hyperedge):
+            corr_matrix = torch.corrcoef(torch.stack((orig_gene, diff_gene)))
+            correlations.append(corr_matrix[0, 1].item())
+        
+        hyperedge_correlations.append(correlations)
+    
+    hyperedge_correlations = torch.tensor(hyperedge_correlations, dtype=torch.float)
     return hyperedge_correlations
-
-    # within each hyperedge, get correlation original_data, diffused_data
 
 def gene_correlation(adata, dataset, correlation_pairs = [(0,1), (0,2), (1,2)]):
     hyperedges = dataset[0].edge_index[1].unique() # check the convention on edge_index for hyperedges
@@ -83,28 +158,49 @@ def gene_correlation(adata, dataset, correlation_pairs = [(0,1), (0,2), (1,2)]):
 
     return hyperedge_correlations
 
-def get_hyperedge_features(adata, 
-                           dataset,
-                           features = ['cell_type_hist', 'gene_expression'],
+def get_hyperedge_features(graph_data,
+                           adata,
+                           hyperedges,
+                           hyperedge_index,
+                           features=['gene_expression'],
                            **kwargs):
-
-    feat  = None
+    """
+    Extract features for hyperedges.
+    
+    Parameters:
+    -----------
+    adata : AnnData
+        Annotated data object containing cell information
+    hyperedges : list
+        List of hyperedges, where each hyperedge is a list of node indices
+    features : list
+        List of feature types to extract
+    **kwargs : dict
+        Additional parameters for specific feature extraction methods
+    
+    Returns:
+    --------
+    feat : torch.Tensor
+        Concatenated feature tensor of shape (num_hyperedges, total_feature_dim)
+    """
+    feat = None
+    print(f'Extracting hyperedge features: {features}')
     for feature in features:
-        if feature == 'cell_type_hist':
-            feat_new = cell_type_feat(adata, dataset)
-        elif feature == 'gene_expression':
-            feat_new = gene_expression_feat(adata, dataset)
+        if feature == 'gene_expression':
+            feat_new = gene_expression_feature(hyperedges, hyperedge_index, node_features=graph_data.x)
         elif feature == 'diffused_gene_correlation':
             num_diffusions = kwargs.get('num_diffusions', 1)
-            feat_new = diffused_gene_correlation(adata, dataset, num_diffusions)
+            feat_new = diffused_gene_correlation(hyperedges, hyperedge_index, node_features=graph_data.x, num_diffusions=1)
+        elif feature == 'cell_type_hist':
+            feat_new = cell_type_distribution_feature(adata, hyperedges)
         elif feature == 'gene_correlation':
             # get correlation pairs from kwargs
-            correlation_pairs = kwargs.get('correlation_pairs', [(0,1), (0,2), (1,2)])
-            feat_new = gene_correlation(adata, dataset, correlation_pairs)
+            correlation_pairs = kwargs.get('correlation_pairs', [(0, 1), (0, 2), (1, 2)])
+            feat_new = gene_correlation(adata, hyperedges, correlation_pairs)
         else:
-            raise ValueError('Feature not supported')
-        # concatenate the features
+            raise ValueError(f'Feature "{feature}" not supported')
         
+        # concatenate the features
         if feat is None:
             feat = feat_new
         else:

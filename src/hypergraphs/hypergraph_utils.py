@@ -13,30 +13,65 @@ from torch_geometric.data import Dataset
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_undirected
 
+from hypergraphs.featurizers import get_hyperedge_features
 
-def data_to_hg(data, add_k_hop=1):
-    edge_index_undirected = to_undirected(data.edge_index)
+def spatial_graph_to_hypergraph(graph_data, adata, hyperedge_features_list, k_hop=1, **kwargs):
+    """
+    Convert a spatial graph to a hypergraph representation.
+    Need to receive adata to compute hyperedge features.
+    Parameters:
+    -----------
+    data : torch_geometric.data.Data
+        Input graph data
+    adata : AnnData
+        Annotated data object
+    hyperedge_features_list : list
+        List of feature types to extract for hyperedges
+    k_hop : int
+        Number of hops for neighborhood extraction
+    **kwargs : dict
+        Additional parameters passed to get_hyperedge_features
+    
+    Returns:
+    --------
+    HyperGraphData : object
+        Hypergraph representation of the input data
+    """
+    edge_index_undirected = to_undirected(graph_data.edge_index)
     hyperedges = []
 
-    for node_idx in range(data.num_nodes):
-        # first check if node_idx is in the graph. For some reason the mismatch appears to be very large!
+    for node_idx in range(graph_data.num_nodes):
+        # first check if node_idx is in the graph
         if node_idx not in edge_index_undirected[0]:
-            print(f'Node {node_idx} not in graph, skipping.")')
+            print(f'Node {node_idx} not in graph, skipping.')
             continue
 
         subset, edge_index, mapping, edge_mask = torch_geometric.utils.k_hop_subgraph(
-            node_idx=node_idx, num_hops=add_k_hop, edge_index=edge_index_undirected, relabel_nodes=False
+            node_idx=node_idx, 
+            num_hops=k_hop, 
+            edge_index=edge_index_undirected, 
+            relabel_nodes=False
         )
+        
         hyperedges.append(subset.tolist())
 
     hyperedge_index = get_hyperedge_index_from_edges(hyperedges)
+    
+    hyperedge_attr = get_hyperedge_features(
+        graph_data=graph_data,
+        adata=adata,
+        hyperedges=hyperedges,
+        hyperedge_index=hyperedge_index,
+        features=hyperedge_features_list,
+        **kwargs
+    )
 
-    #TODO: Understand Hyperedge node features
-    #Currently just setting as zero and using the num_features the same of nodes.
-    num_hyperedges = len(hyperedges)
-
-    hyperedge_attr = torch.zeros(num_hyperedges, data.x.shape[1]) # use all zero hyperedge attributes
-    return HyperGraphData(x=data.x, edge_index=hyperedge_index, edge_attr=hyperedge_attr, y=torch.from_numpy(np.array(data.y)))
+    return HyperGraphData(
+        x=graph_data.x, 
+        edge_index=hyperedge_index, 
+        edge_attr=hyperedge_attr, 
+        y=torch.from_numpy(np.array(graph_data.y))
+    )
 
 def get_hyperedge_index_from_edges(hyperedges):
     """
@@ -54,6 +89,12 @@ def get_hyperedge_index_from_edges(hyperedges):
         flattened_list.extend(hyperedge)
         index_list.extend([i] * len(hyperedge))
 
+    # Exemple of the expected edge_index for HyperGraphData
+    # # hyper graph with two hyperedges connecting 3 and 4 nodes, respectively
+    # edge_index = torch.tensor([
+    #     [0, 1, 2, 1, 2, 3, 4],
+    #     [0, 0, 0, 1, 1, 1, 1],
+    # ])
     return torch.tensor([flattened_list, index_list], dtype=torch.long)
 
 def get_clique_from_node( node_idx, graph ):
@@ -182,64 +223,6 @@ class CliqueHyperEdgeTransform(BaseTransform):
     def __repr__(self):
         return f"CliqueHyperEdgeTransform"
 
-# Remaining functions remain the same with minor modifications if necessary
-def get_HyperGraphData(HG, node_features, hyperedge_attr, labels, other_data=None):
-    """
-    Modified to use the new hyperedge index tensor.
-    """
-    data = HyperGraphData(x=node_features, edge_index=HG.edge_index, edge_attr=hyperedge_attr, y=labels)
-    if other_data is not None:
-        for key in other_data.keys():
-            data[key] = other_data[key]
-            if key == 'graph_y' and labels is None:
-                data['y'] = other_data[key]
-    return data
-
-def get_HG_data_list(original_dataset, to_hg_func=data_to_hg):
-    hgdataset = []
-    for graph_dat in tqdm(original_dataset, desc='Converting to hypergraph data'):
-        hgdataset.append(to_hg_func(graph_dat))
-    return hgdataset
-
-class HGDatasetFromHGList(Dataset):
-    def __init__(self, HG_list, node_features, hyperedge_attrs, labels, other_data=None, transform=None, pre_transform=None):
-        super(HGDatasetFromHGList, self).__init__('.', transform, pre_transform)
-        self.data_list = []
-        for HG, node_feature, hyperedge_attr, label in zip(HG_list, node_features, hyperedge_attrs, labels):
-            # subtract 1 from the label so the counts start at zero
-            self.data_list.append(get_HyperGraphData(HG, node_feature, hyperedge_attr, torch.tensor(label - 1).unsqueeze(0), other_data))
-
-    def len(self):
-        return len(self.data_list)
-
-    def get(self, idx):
-        return self.data_list[idx]
-
-class HGDataset(Dataset):
-    def __init__(self, original_dataset, to_hg_func, transform=None, pre_transform=None):
-        super(HGDataset, self).__init__('.', transform, pre_transform)
-        self.original_dataset = original_dataset
-        self.to_hg_func = to_hg_func
-        self.data_list = get_HG_data_list(original_dataset, to_hg_func)
-
-    def len(self):
-        return len(self.data_list)
-
-    def get(self, idx):
-        return self.data_list[idx]
-
-class HGDatasetFromDGL(Dataset):
-    def __init__(self, HG, X, Y, lbl, transform=None, pre_transform=None):
-        super(HGDatasetFromDGL, self).__init__('.', transform, pre_transform)
-        hgdata = get_HyperGraphData(HG, X, Y, lbl)
-        self.data_list = [hgdata]
-
-    def len(self):
-        return len(self.data_list)
-
-    def get(self, idx):
-        return self.data_list[idx]
-
 
 if __name__ == "__main__":
     def sample_data_func():
@@ -253,9 +236,9 @@ if __name__ == "__main__":
 
     sample_data = sample_data_func()
 
-    def test_data_to_hg_with_k_hop(sample_data):
-        """Test data_to_hg with 1-hop addition."""
-        hg = data_to_hg(sample_data, add_k_hop=1)
+    def test_spatial_graph_to_hypergraph_with_k_hop(sample_data):
+        """Test spatial_graph_to_hypergraph with 1-hop addition."""
+        hg = spatial_graph_to_hypergraph(sample_data, k_hop=1)
         assert hg.edge_index.shape[1] > sample_data.edge_index.shape[1]
         print(hg.edge_index)
         assert (hg.edge_index[1,:] == 0).sum() == 4 # 0's k hop neighborhood has 4 elements
@@ -271,15 +254,7 @@ if __name__ == "__main__":
         assert hyperedge_index.shape == (2, 5)
         assert hyperedge_index.tolist() == [[0, 1, 2, 3, 4], [0, 0, 0, 1, 1]]
 
-    def test_create_HGDataset():
-        """Test HGDataset creation."""
-        dataset = [sample_data, sample_data]
-        hg_dataset = HGDataset(dataset, data_to_hg)
-        assert len(hg_dataset) == 2
-        assert isinstance(hg_dataset.get(0), HyperGraphData)
-        # print the first hypergraph's edge index
-        print(hg_dataset.get(0).edge_index)
 
-    test_data_to_hg_with_k_hop(sample_data)
-    test_create_HGDataset()
+    test_spatial_graph_to_hypergraph_with_k_hop(sample_data)
+
 

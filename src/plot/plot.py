@@ -8,7 +8,7 @@ from torch_geometric.utils.convert import from_networkx
 import sys
 
 from src.models.hypergraph_scattering import HyperScatteringModule
-from src.hypergraphs.hypergraph_utils import HGDataset, data_to_hg
+from src.hypergraphs.hypergraph_utils import HGDataset, spatial_graph_to_hypergraph
 
 
 def get_hyperedge_pos_df(hgdataset, coordinates):
@@ -130,7 +130,7 @@ def get_wv_plots(G, X_data, coordinates, num_hops=1, graph_info='', device='cpu'
     data.x = torch.tensor(X_data)
     original_dataset = [data]
 
-    to_hg_func = lambda g: data_to_hg(g, add_k_hop=num_hops)
+    to_hg_func = lambda g: spatial_graph_to_hypergraph(g, add_k_hop=num_hops)
 
     dataset = HGDataset(original_dataset, to_hg_func)
     eidf = get_hyperedge_pos_df(dataset[0], coordinates)

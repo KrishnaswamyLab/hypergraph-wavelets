@@ -9,8 +9,8 @@ from torch_geometric.data import Data
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.hypergraphs.hypergraph_utils import data_to_hg
-from src.graphs.builder import return_graph_data
+from src.hypergraphs.hypergraph_utils import spatial_graph_to_hypergraph
+from src.graphs.builder import return_spatial_graph_data
 
 logging.getLogger('pysmiles').setLevel(logging.CRITICAL)
 
@@ -76,7 +76,7 @@ class PlacentaDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Data:
         adata = ad.read_h5ad(self.graph_path_arr[idx])
-        graph_data = return_graph_data(adata, mode='knn')
+        graph_data = return_spatial_graph_data(adata, mode='knn')
         y_true = self.class_arr[idx]
         graph_data.y = y_true
 
@@ -101,7 +101,7 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
 
     def __getitem__(self, idx: int) -> Data:
         adata = ad.read_h5ad(self.graph_path_arr[idx])
-        graph_data = return_graph_data(adata, mode='knn')
+        graph_data = return_spatial_graph_data(adata, mode='knn')
         y_true = self.class_arr[idx]
         graph_data.y = y_true
 
@@ -115,7 +115,7 @@ class PlacentaDatasetHypergraph(PlacentaDataset):
         if self.transform:
             graph_data = self.transform(graph_data)
 
-        hypergraph = data_to_hg(graph_data, add_k_hop=self.k_hop)
+        hypergraph = spatial_graph_to_hypergraph(graph_data, add_k_hop=self.k_hop)
 
         return hypergraph
 

@@ -8,12 +8,12 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from models.hyper_scattering_net import HSN
-from utils.hypergraph_utils import HGDataset, data_to_hg
+from utils.hypergraph_utils import HGDataset, spatial_graph_to_hypergraph
 
 original_dataset = TUDataset(root='../data/', name="MUTAG", use_node_attr=True)
 
 
-to_hg_func = lambda g: data_to_hg(g, add_k_hop=1)
+to_hg_func = lambda g: spatial_graph_to_hypergraph(g, add_k_hop=1)
 
 hgdataset = HGDataset(original_dataset, to_hg_func)
 dl = DataLoader(hgdataset, batch_size=32, shuffle=True)

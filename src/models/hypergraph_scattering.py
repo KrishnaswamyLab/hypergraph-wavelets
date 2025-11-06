@@ -56,13 +56,14 @@ class HyperDiffusion(MessagePassing):
     ):
         kwargs.setdefault('aggr', 'add')
         super().__init__(flow='source_to_target', node_dim=0, **kwargs)
+        assert normalize in ["right", "left", "symmetric"], f"normalize must be one of 'right', 'left', or 'symmetric', not {normalize}"
+        self.normalize = normalize
+
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.trainable_laziness = trainable_laziness
         self.fixed_weights = fixed_weights
-        assert normalize in ["right", "left", "symmetric"], f"normalize must be one of 'right', 'left', or 'symmetric', not {self.normalize}"
 
-        self.normalize = normalize
 
         # in the future, we could make this time independent, but spatially dependent, as in GRAND
         if trainable_laziness:
@@ -201,14 +202,16 @@ class HyperScatteringModule(nn.Module):
             edge_features.append(edge_feat)
 
         # Combine the diffusion levels into a single tensor.
-        diffusion_levels = rearrange(node_features, 'i j k -> i j k').float()
-        edge_diffusion_levels = rearrange(edge_features, 'i j k -> i j k').float()
-        node_emb = torch.einsum("ij,jkl->ikl", self.wavelet_constructor, diffusion_levels) # J x num_nodes x num_features x 1
-        edge_emb = torch.einsum("ij,jkl->ikl", self.wavelet_constructor, edge_diffusion_levels)
+        diffusion_levels = torch.stack(node_features, dim=0).float()  # shape: [levels+1, num_nodes, feat_dim]
+        edge_diffusion_levels = torch.stack(edge_features, dim=0).float()  # shape: [levels+1, num_edges, feat_dim]
+
+        node_emb = torch.einsum("ij,jkl->ikl", self.wavelet_constructor, diffusion_levels) # shape: [J,num_nodes,feat_dim]
+        edge_emb = torch.einsum("ij,jkl->ikl", self.wavelet_constructor, edge_diffusion_levels) # shape: [J,num_edges,feat_dim]
+
         # [scales, nodes, features] -> [nodes, scales * features]
-        node_emb = rearrange(node_emb, 's n f -> n (s f)') if self.reshape else torch.stack(node_emb)
+        node_emb = rearrange(node_emb, 's n f -> n (s f)') if self.reshape else node_emb
         # [scales, edges, features] -> [edges, scales * features]
-        edge_emb = rearrange(edge_emb, 's e f -> e (s f)') if self.reshape else torch.stack(edge_emb)
+        edge_emb = rearrange(edge_emb, 's e f -> e (s f)') if self.reshape else edge_emb
 
         return node_emb, edge_emb
 
@@ -227,7 +230,7 @@ class ScatteringActivation(nn.Module):
         # node_emb = self.norm_node(rearrange(node_emb, 's b l -> (w b) l'))
         # node_emb = rearrange(node_emb, '(w b) l -> s b l', s=len(self.wavelet_constructor))
         node_emb = self.activation(node_emb)
-        edge_emb = self.activate(edge_emb)
+        edge_emb = self.activation(edge_emb)
         return node_emb, edge_emb
 
 
@@ -243,7 +246,7 @@ class FeatureSelfAttention(nn.Module):
 
     def forward(self, x, return_attn: bool = False):
         '''
-        The shape of x is [B, F, S]: (batch size, num features, scattering scales).
+        The shape of x is [B, F, S]: (batch size, num_features, scattering_scales).
         '''
         # Apply self-attention across the feature dimension (F positions)
         x, attn_weights = self.attn(x, x, x)  # [B, F, S]
@@ -259,13 +262,14 @@ class NicheAttention(nn.Module):
         super().__init__()
         self.gate_nn = nn.Linear(num_features, 1)
 
-    def forward(self, x, batch, return_attn=False):
-        gate_scores = self.gate_nn(x).squeeze(-1)                        # [N]
-        attn_weights = scatter_softmax(gate_scores, batch)               # [N]
-        out = scatter_sum(x * attn_weights.unsqueeze(-1), batch, dim=0)  # [B, F]
+    def forward(self, x, batch, return_attn=False): #x.shape = [num_nodes, num_features]
+        gate_scores = self.gate_nn(x).squeeze(-1)                        # [num_nodes]
+        attn_weights = scatter_softmax(gate_scores, batch)               # [num_nodes]
+        out = scatter_sum(x * attn_weights.unsqueeze(-1), batch, dim=0)  # [B, num_features]
 
         if return_attn:
             return out, attn_weights
+        
         return out
 
 

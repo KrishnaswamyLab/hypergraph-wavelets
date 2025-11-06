@@ -64,6 +64,7 @@ def prepare_dataloaders(args):
 
     min_batch_per_epoch = 5
     desired_len = args.desired_batch_size * min_batch_per_epoch
+    
     if len(train_set) < desired_len:
         train_set = ExtendedDataset(dataset=train_set, desired_len=desired_len)
 
@@ -205,7 +206,7 @@ if __name__ == "__main__":
     args.add_argument('--random-seed', default=1, type=int)
     args.add_argument('--dataset', default='placenta', type=str)
     args.add_argument('--data-folder', default='$ROOT/data/MIBI/patchified_all_genes', type=str)
-    args.add_argument('--num-features', default=29, type=int)  # number of genes or features
+    args.add_argument('--num-features', default=29, type=int)  # number of genes or features #TODO: this is obtained by the dataset class. should not be a hyperparameter
 
     args = args.parse_known_args()[0]
     seed_everything(args.random_seed)
