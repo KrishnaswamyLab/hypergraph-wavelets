@@ -20,6 +20,8 @@ folder_in = f'../../data/spatial_placenta_accreta_16um/raw/'
 folder_out = f'../../data/spatial_placenta_accreta_16um/patchified_celltype/'
 NUM_BINS = 30
 MIN_PIXEL_PER_GRAPH = 15
+USE_CLASS_UNASSIGNED = False
+
 
 GENES_BY_CELL_TYPE = {
     'Cytotrophoblasts': ['LARGE2', 'LGR5', 'LRP2', 'SLC22A11', 'SLC13A3', 'SLC16A12', 'PEG10', 'NFE2L3'],
@@ -46,7 +48,8 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
                     fig_pc_save_path: str = None,
                     fig_spatial_save_path: str = None,
                     spatial_location: pd.DataFrame = None,
-                    overlay_image: np.ndarray = None) -> Tuple[sparse._csr.csr_matrix, List[str]]:
+                    overlay_image: np.ndarray = None,
+                    use_class_unassigned: bool = True) -> Tuple[sparse._csr.csr_matrix, List[str]]:
     '''
     Infer the cell types for each cell from `gene_matrix`, a cell-by-gene matrix.
     In this sub-cellular spatial-seq data, it's actually a pixel-by-gene matrix,
@@ -75,6 +78,8 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         DataFrame with fields 'X' and 'Y'. Required if `fig_spatial_save_path` is provided.
     overlay_image : np.ndarray, optional
         Original H&E image for overlay visualization.
+    use_class_unassigned : bool, optional
+        Whether we include the "Unassigned" class in label.
 
     Returns:
     --------
@@ -242,6 +247,12 @@ def infer_cell_type(gene_matrix: sparse._csr.csr_matrix,
         fig.tight_layout(pad=2)
         fig.savefig(fig_spatial_save_path.replace('.png', f'_unassigned.png'), dpi=300, bbox_inches='tight')
         plt.close()
+
+    if not use_class_unassigned:
+        assert cell_type_names[-1] == 'Unassigned'
+        cell_type_names = cell_type_names[:-1]
+        assert len(cell_type_matrix.shape) == 2
+        cell_type_matrix = cell_type_matrix[:, :-1]
 
     return sparse.csr_matrix(cell_type_matrix), cell_type_names
 
@@ -504,7 +515,8 @@ if __name__ == '__main__':
             fig_pc_save_path=f'./{dataset_name}/vis_celltype/{target_folder}_pc.png',
             fig_spatial_save_path=f'./{dataset_name}/vis_celltype/{target_folder}_spatial.png',
             spatial_location=barcode_position[['X', 'Y', 'pixel_row_in_highres', 'pixel_col_in_highres']],
-            overlay_image=image)
+            overlay_image=image,
+            use_class_unassigned=USE_CLASS_UNASSIGNED)
 
         visualize_gene_expression_profiles(
             gene_matrix=celltype_related_matrix,

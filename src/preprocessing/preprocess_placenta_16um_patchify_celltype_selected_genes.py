@@ -17,6 +17,7 @@ folder_in = '../../data/spatial_placenta_accreta_16um/raw/'
 folder_out = '../../data/spatial_placenta_accreta_16um/patchified_celltype_selected_genes/'
 NUM_BINS = 30
 MIN_PIXEL_PER_GRAPH = 15
+USE_CLASS_UNASSIGNED = False
 
 
 if __name__ == '__main__':
@@ -101,7 +102,8 @@ if __name__ == '__main__':
         celltype_label_matrix, cell_type_names = infer_cell_type(
             celltype_related_matrix,
             GENES_BY_CELL_TYPE,
-            gene_to_index)
+            gene_to_index,
+            use_class_unassigned=USE_CLASS_UNASSIGNED)
 
         # Normalize the gene expression for each cell.
         adata_genes = ad.AnnData(X=celltype_related_matrix, var=pd.DataFrame(index=celltype_related_features))
