@@ -80,27 +80,6 @@ def rank_top_k(records: List[dict], class_idx: int, top_k: int) -> List[dict]:
     return class_records[:top_k]
 
 
-def write_csv(output_path: str, rows: List[dict], class_map: Dict[int, str]) -> None:
-    num_classes = len(class_map)
-    fieldnames = [
-        'rank',
-        'class_idx',
-        'class_name',
-        'sample_idx',
-        'dataset_index',
-        'path',
-        'true_label',
-        'pred_label',
-        'true_class_logit',
-    ] + [f'logit_class_{i}' for i in range(num_classes)]
-
-    with open(output_path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
-
-
 def _load_sample_visual_data(dataset, local_idx: int) -> Tuple[np.ndarray, np.ndarray, List[str], torch.Tensor]:
     graph_path = _get_graph_path(dataset, local_idx)
     if graph_path is None:
@@ -116,17 +95,51 @@ def _load_sample_visual_data(dataset, local_idx: int) -> Tuple[np.ndarray, np.nd
     return coords, cell_type_ids, cell_type_names, data_item.edge_index
 
 
-def load_attentions(attention_path: str) -> Tuple[np.ndarray, np.ndarray]:
+def load_attentions(attention_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Load pre-computed attentions from the same npz saved by vis_attention.save_test_set_attentions.
-    Returns (niche_attention_arr, mlp_weights). niche_attention_arr[i] is the niche attention for test sample i.
+    Returns (niche_attention_arr, feature_attention_arr, mlp_weights, logits_arr).
+    niche_attention_arr[i] is the niche attention for test sample i.
+    logits_arr[i] is the raw model logits for test sample i (used for class-specific weighting).
     """
     if not os.path.isfile(attention_path):
         raise FileNotFoundError(
             f'Attentions not found at {attention_path}. Run vis_attention.py first to generate attentions.npz.'
         )
     data = np.load(attention_path, allow_pickle=True)
-    return data['niche_attention_arr'], np.array(data['mlp_weights'])
+    return (
+        data['niche_attention_arr'],
+        data['feature_attention_arr'],
+        np.array(data['mlp_weights']),
+        np.array(data['y_pred_arr']),
+    )
+
+
+def _compute_hyperedge_importance(
+    niche_attn: np.ndarray,
+    hyperedge_index: torch.Tensor,
+) -> Optional[np.ndarray]:
+    """
+    Per-hyperedge importance from per-node niche attention (mean over members).
+    Returns None on shape mismatch.
+    """
+    if hyperedge_index is None or hyperedge_index.numel() == 0 or niche_attn.size == 0:
+        return None
+    node_ids = hyperedge_index[0].cpu().numpy()
+    hyperedge_ids = hyperedge_index[1].cpu().numpy()
+    if node_ids.size == 0:
+        return None
+    num_hyperedges = int(hyperedge_ids.max()) + 1
+    num_nodes = int(node_ids.max()) + 1
+    niche_attn = np.asarray(niche_attn, dtype=np.float64)
+    if niche_attn.size != num_nodes:
+        return None
+    hyperedge_importance = np.zeros(num_hyperedges, dtype=np.float64)
+    for hyperedge_id in range(num_hyperedges):
+        members = node_ids[hyperedge_ids == hyperedge_id]
+        if members.size > 0:
+            hyperedge_importance[hyperedge_id] = np.mean(niche_attn[members])
+    return hyperedge_importance
 
 
 def _plot_hyperedges_contour(
@@ -134,8 +147,6 @@ def _plot_hyperedges_contour(
     coords: np.ndarray,
     hyperedge_index: torch.Tensor,
     niche_attn: np.ndarray,
-    class_idx: int,
-    mlp_weights: np.ndarray,
     max_hyperedges: int,
     contour_alpha: float,
     contour_cmap: str,
@@ -143,8 +154,7 @@ def _plot_hyperedges_contour(
 ) -> None:
     """
     Draw each hyperedge as a curved contour (convex hull or circle for 2 nodes),
-    colored by niche attention (aggregated per hyperedge) scaled by the class MLP weight norm.
-    niche_attn: one value per (node, hyperedge) incidence; will be summed per hyperedge.
+    colored by niche attention aggregated per hyperedge.
     coords: (n, 2) with [:,0]=y, [:,1]=x for plotting.
     """
     if hyperedge_index is None or hyperedge_index.numel() == 0 or niche_attn.size == 0:
@@ -154,30 +164,9 @@ def _plot_hyperedges_contour(
     if node_ids.size == 0:
         return
 
-    num_he = int(hyperedge_ids.max()) + 1
-    num_nodes = int(node_ids.max()) + 1
-    he_importance = np.zeros(num_he, dtype=np.float64)
-    niche_attn = np.asarray(niche_attn, dtype=np.float64)
-    if niche_attn.size == hyperedge_ids.size:
-        # Per-incidence attention: aggregate to per-hyperedge importance
-        for i, he_id in enumerate(hyperedge_ids):
-            he_importance[int(he_id)] += niche_attn[i]
-    elif niche_attn.size == num_he:
-        # Per-hyperedge attention: use directly
-        he_importance[:] = niche_attn
-    elif niche_attn.size == num_nodes:
-        # Per-node attention: aggregate by hyperedge (mean over members)
-        for he_id in range(num_he):
-            members = node_ids[hyperedge_ids == he_id]
-            if members.size > 0:
-                he_importance[he_id] = np.mean(niche_attn[members])
-    else:
-        return  # shape mismatch, cannot draw
-    # Attention weights scaled by MLP weights
-    scale = 1.0
-    if mlp_weights is not None and class_idx < mlp_weights.shape[0]:
-        scale = max(1e-6, np.linalg.norm(mlp_weights[class_idx]))
-    importance = he_importance * scale
+    importance = _compute_hyperedge_importance(niche_attn, hyperedge_index)
+    if importance is None:
+        return
     i_min, i_max = importance.min(), importance.max()
     if i_max > i_min:
         importance = (importance - i_min) / (i_max - i_min)
@@ -233,8 +222,7 @@ def plot_niche_prototypes(records_by_class: Dict[int, List[dict]],
                           output_path: str,
                           max_hyperedges: int,
                           node_size: float = 80,
-                          niche_attn_by_split: Optional[Dict[int, np.ndarray]] = None,
-                          mlp_weights: Optional[np.ndarray] = None,
+                          niche_attn_by_sample: Optional[Dict[int, np.ndarray]] = None,
                           contour_alpha: float = 0.15,
                           contour_cmap: str = 'Reds') -> None:
 
@@ -297,16 +285,14 @@ def plot_niche_prototypes(records_by_class: Dict[int, List[dict]],
                            alpha=0.8,
                            zorder=2)
 
-                if max_hyperedges > 0 and niche_attn_by_split is not None:
-                    niche_attn = niche_attn_by_split.get(record['sample_idx'])
+                if max_hyperedges > 0 and niche_attn_by_sample is not None:
+                    niche_attn = niche_attn_by_sample.get(record['sample_idx'])
                     if niche_attn is not None:
                         _plot_hyperedges_contour(
                             ax,
                             coords_shifted,
                             hyperedge_index,
                             niche_attn,
-                            class_idx=class_idx,
-                            mlp_weights=mlp_weights,
                             max_hyperedges=max_hyperedges,
                             contour_alpha=contour_alpha,
                             contour_cmap=contour_cmap,
@@ -330,13 +316,13 @@ def plot_niche_prototypes(records_by_class: Dict[int, List[dict]],
             legend_ax.scatter([], [], c=[cmap(sorted_idx % cmap.N)], label=cell_type_name, s=120, alpha=0.8)
         legend_ax.legend(loc='center left', frameon=False, fontsize=14,
                          title='Cell type', title_fontsize=20)
-        if niche_attn_by_split is not None and mlp_weights is not None:
+        if niche_attn_by_sample is not None:
             sm = plt.cm.ScalarMappable(cmap=plt.get_cmap(contour_cmap), norm=plt.Normalize(vmin=0, vmax=1))
             sm.set_array([])
             div = make_axes_locatable(legend_ax)
             cax = div.append_axes('right', size='8%', pad=0.4)
             cbar = fig.colorbar(sm, cax=cax)
-            cbar.set_label('Attention weights scaled by MLP weights', fontsize=12, labelpad=16)
+            cbar.set_label('Niche attention weights', fontsize=12, labelpad=16)
 
     for row_idx in range(max_rows):
         for col_idx in range(num_classes * 2, num_cols):
@@ -346,6 +332,68 @@ def plot_niche_prototypes(records_by_class: Dict[int, List[dict]],
 
     fig.tight_layout(pad=1.0)
     fig.savefig(output_path, dpi=300)
+    plt.close(fig)
+
+
+def plot_cooccurrence_heatmap(
+    dataset,
+    niche_attention_arr: np.ndarray,
+    logits_arr: np.ndarray,
+    class_map: Dict[int, str],
+    output_path: str,
+) -> None:
+    """
+    Heatmap of co-occurring cell types (A x B) per class.
+
+    Per-hyperedge importance = mean niche attention over nodes in the hyperedge (which
+    nodes the model attends to). Class-specific weighting uses the raw class-c logit:
+    each sample's contribution to the class-c heatmap is weighted by logits[sample, c],
+    so heatmaps differ by class and can be negative (pushing away from class c).
+    Value (A,B) for class c = sum over samples and hyperedges containing both A and B
+    of (hyperedge importance) * logit_c(sample).
+    """
+    _, _, cell_type_names, _ = _load_sample_visual_data(dataset, 0)
+    num_cell_types = len(cell_type_names)
+    n_samples = min(len(dataset), len(niche_attention_arr), len(logits_arr))
+    num_classes = len(class_map)
+
+    fig, axes = plt.subplots(1, num_classes, figsize=(6 * num_classes, 5))
+    if num_classes == 1:
+        axes = [axes]
+    for ax, (class_idx, class_name) in zip(axes, class_map.items()):
+        w = np.asarray(logits_arr[:n_samples, class_idx], dtype=np.float64)
+        M = np.zeros((num_cell_types, num_cell_types), dtype=np.float64)
+        for sample_idx in tqdm(range(n_samples)):
+            _, cell_type_ids, _, hyperedge_index = _load_sample_visual_data(dataset, sample_idx)
+            cell_type_ids = np.asarray(cell_type_ids)
+            niche_attn = np.asarray(niche_attention_arr[sample_idx])
+            importance = _compute_hyperedge_importance(niche_attn, hyperedge_index)
+            if importance is None:
+                continue
+            node_ids = hyperedge_index[0].cpu().numpy()
+            hyperedge_ids = hyperedge_index[1].cpu().numpy()
+            num_hyperedges = importance.size
+            for hyperedge_id in range(num_hyperedges):
+                members = node_ids[hyperedge_ids == hyperedge_id]
+                if members.size < 2:
+                    continue
+                cell_types_in_hyperedge = np.unique(cell_type_ids[members])
+                imp = importance[hyperedge_id] * w[sample_idx]
+                for i in range(len(cell_types_in_hyperedge)):
+                    for j in range(i + 1, len(cell_types_in_hyperedge)):
+                        a, b = int(cell_types_in_hyperedge[i]), int(cell_types_in_hyperedge[j])
+                        M[a, b] += imp
+                        M[b, a] += imp
+        two_std = 2 * np.std(M)
+        im = ax.imshow(M, cmap='coolwarm', aspect='auto', vmin=-two_std, vmax=two_std)
+        ax.set_xticks(range(num_cell_types))
+        ax.set_yticks(range(num_cell_types))
+        ax.set_xticklabels(cell_type_names, rotation=45, ha='right')
+        ax.set_yticklabels(cell_type_names)
+        ax.set_title(class_name)
+        fig.colorbar(im, ax=ax)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
 
 
@@ -400,44 +448,31 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(model_save_path, map_location=device, weights_only=True))
     records = collect_logits(model, dataset, device=device, num_workers=args.num_workers)
 
-    output_rows: List[dict] = []
     top_by_class: Dict[int, List[dict]] = {}
     for class_idx, class_name in class_map.items():
-        top_records = rank_top_k(records, class_idx=class_idx, top_k=args.top_k)
-        top_by_class[class_idx] = top_records
-        for rank_idx, record in enumerate(top_records, start=1):
-            row = {
-                'rank': rank_idx,
-                'class_idx': class_idx,
-                'class_name': class_name,
-                'sample_idx': record['sample_idx'],
-                'dataset_index': record['dataset_index'],
-                'path': record['path'],
-                'true_label': record['true_label'],
-                'pred_label': record['pred_label'],
-                'true_class_logit': record['logits'][class_idx],
-            }
-            for logit_idx, logit_val in enumerate(record['logits']):
-                row[f'logit_class_{logit_idx}'] = logit_val
-            output_rows.append(row)
-
-    output_path = os.path.join(output_dir, 'niche_prototypes_test.csv')
-    write_csv(output_path, output_rows, class_map=class_map)
-    print(f'Saved: {output_path}')
+        top_by_class[class_idx] = rank_top_k(records, class_idx=class_idx, top_k=args.top_k)
 
     attention_path = os.path.join(output_dir, 'attentions.npz')
-    niche_attention_arr, mlp_weights = load_attentions(attention_path)
-    sample_indices = list({r['sample_idx'] for records in top_by_class.values() for r in records})
-    niche_attn_by_split = {i: niche_attention_arr[i] for i in sample_indices}
+    if not os.path.isfile(attention_path):
+        raise FileNotFoundError(
+            f'Attentions not found at {attention_path}. Run vis_attention.py first to generate attentions.npz.'
+        )
+    niche_attention_arr, feature_attention_arr, mlp_weights, logits_arr = load_attentions(attention_path)
 
-    figure_path = os.path.join(output_dir, 'niche_prototype.png')
+    figure_path_cooccur = os.path.join(output_dir, 'niche_cooccurrence_heatmap.png')
+    plot_cooccurrence_heatmap(dataset, niche_attention_arr, logits_arr, class_map, figure_path_cooccur)
+    print(f'Saved: {figure_path_cooccur}')
+
+    sample_indices = list({r['sample_idx'] for records in top_by_class.values() for r in records})
+    niche_attn_by_sample = {i: niche_attention_arr[i] for i in sample_indices}
+
+    figure_path_topk = os.path.join(output_dir, 'niche_topk_prototypes.png')
     plot_niche_prototypes(
         records_by_class=top_by_class,
         dataset=dataset,
         class_map=class_map,
-        output_path=figure_path,
+        output_path=figure_path_topk,
         max_hyperedges=args.max_hyperedges,
-        niche_attn_by_split=niche_attn_by_split,
-        mlp_weights=mlp_weights,
+        niche_attn_by_sample=niche_attn_by_sample,
     )
-    print(f'Saved: {figure_path}')
+    print(f'Saved: {figure_path_topk}')
