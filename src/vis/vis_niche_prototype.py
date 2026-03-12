@@ -322,7 +322,7 @@ def plot_niche_prototypes(records_by_class: Dict[int, List[dict]],
             div = make_axes_locatable(legend_ax)
             cax = div.append_axes('right', size='8%', pad=0.4)
             cbar = fig.colorbar(sm, cax=cax)
-            cbar.set_label('Niche attention weights', fontsize=12, labelpad=16)
+            cbar.set_label('Niche attention weights', fontsize=16, labelpad=16)
 
     for row_idx in range(max_rows):
         for col_idx in range(num_classes * 2, num_cols):
