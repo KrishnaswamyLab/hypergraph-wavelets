@@ -21,8 +21,8 @@ from einops import rearrange
 from torch_geometric.nn.pool import global_mean_pool
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import scatter
+from torch_geometric.utils import softmax as pyg_softmax
 from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
-from torch_scatter import scatter_softmax, scatter_sum
 
 
 class LazyLayer(torch.nn.Module):
@@ -269,9 +269,9 @@ class NicheAttention(nn.Module):
         The shape of `x` is [num_nodes, num_features].
         NOTE: In our case, `x` is the hyperedge features.
         '''
-        gate_scores = self.gate_nn(x).squeeze(-1)                        # [num_nodes]
-        attn_weights = scatter_softmax(gate_scores, batch)               # [num_nodes]
-        out = scatter_sum(x * attn_weights.unsqueeze(-1), batch, dim=0)  # [B, num_features]
+        gate_scores = self.gate_nn(x).squeeze(-1)                              # [num_nodes]
+        attn_weights = pyg_softmax(gate_scores, batch)                         # [num_nodes]
+        out = scatter(x * attn_weights.unsqueeze(-1), batch, dim=0, reduce='sum')  # [B, num_features]
 
         if return_attn:
             return out, attn_weights
